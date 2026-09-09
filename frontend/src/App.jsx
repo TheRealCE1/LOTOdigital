@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Html5Qrcode } from 'html5-qrcode';
 
 const API_URL = 'http://localhost:4000/api';
 
@@ -13,16 +14,59 @@ export default function App() {
   const [empleado, setEmpleado] = useState('48213');
   const [machineInfo, setMachineInfo] = useState(initialMachine);
   const [event, setEvent] = useState(null);
+  const [checkinPoints, setCheckinPoints] = useState([]);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [error, setError] = useState('');
 
-  const steps = useMemo(
-    () => [
-      'Bloquear breaker principal',
-      'Cerrar válvula neumática',
-      'Cerrar válvula hidráulica'
-    ],
-    []
-  );
+  useEffect(() => {
+    if (!scannerOpen) return undefined;
+
+    const scanner = new Html5Qrcode('qr-reader');
+    let active = true;
+
+    scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 250, height: 180 } },
+      async (decodedText) => {
+        if (!active) return;
+
+        active = false;
+        setQrCode(decodedText);
+        setScannerOpen(false);
+
+        try {
+          const res = await fetch(`${API_URL}/maquinas/${encodeURIComponent(decodedText)}`);
+          const data = await res.json();
+
+          if (!res.ok) {
+            setError(data?.error || 'El QR no corresponde a una máquina');
+            return;
+          }
+
+          setMachineInfo({
+            qrCode: data.qrCode,
+            nombre: data.nombre,
+            linea: data.linea?.nombre || 'Sin línea',
+            puntos: data.puntos || []
+          });
+          setError('');
+        } catch (err) {
+          setError('No se pudo conectar con el backend');
+        }
+
+        scanner.stop().catch(() => {});
+      },
+      () => {}
+    ).catch(() => {
+      setScannerOpen(false);
+      setError('No se pudo acceder a la cámara. Revisa los permisos.');
+    });
+
+    return () => {
+      active = false;
+      scanner.stop().catch(() => {});
+    };
+  }, [scannerOpen]);
 
   async function checkMachine() {
     try {
@@ -37,7 +81,8 @@ export default function App() {
       setMachineInfo({
         qrCode: data.qrCode,
         nombre: data.nombre,
-        linea: data.linea?.nombre || 'Sin línea'
+        linea: data.linea?.nombre || 'Sin línea',
+        puntos: data.puntos || []
       });
       setError('');
     } catch (err) {
@@ -61,9 +106,44 @@ export default function App() {
       }
 
       setEvent(data.evento);
+      setCheckinPoints(data.evento.puntos || []);
       setError('');
     } catch (err) {
       setError('No se pudo abrir el LOTO');
+    }
+  }
+
+  async function completeCheckinPoint(eventPoint, index) {
+    if (index > 0 && !checkinPoints[index - 1].completado) {
+      setError('Completa primero el punto anterior');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/eventos/${event.id}/checkpoint`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          puntoBloqueoId: eventPoint.puntoBloqueoId,
+          tipo: 'CHECKIN',
+          completado: true
+        })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data?.error || 'No se pudo completar el punto');
+        return;
+      }
+
+      setCheckinPoints((current) => current.map((point) =>
+        point.puntoBloqueoId === eventPoint.puntoBloqueoId
+          ? { ...point, completado: true }
+          : point
+      ));
+      setError('');
+    } catch (err) {
+      setError('No se pudo guardar el punto');
     }
   }
 
@@ -72,8 +152,8 @@ export default function App() {
 
     try {
       const payload = {
-        puntos: steps.map((step, index) => ({
-          puntoBloqueoId: index + 1,
+        puntos: [...checkinPoints].reverse().map((point, index) => ({
+          puntoBloqueoId: point.puntoBloqueoId,
           orden: index + 1,
           completado: true
         }))
@@ -93,6 +173,7 @@ export default function App() {
       }
 
       setEvent(null);
+      setCheckinPoints([]);
       setError('');
       alert('LOTO cerrado correctamente');
     } catch (err) {
@@ -115,6 +196,12 @@ export default function App() {
           <input value={qrCode} onChange={(e) => setQrCode(e.target.value)} />
         </label>
 
+        <button className="secondary" onClick={() => setScannerOpen((open) => !open)}>
+          {scannerOpen ? 'Cerrar cámara' : 'Escanear QR con cámara'}
+        </button>
+
+        {scannerOpen && <div id="qr-reader" className="qr-reader" />}
+
         <button className="secondary" onClick={checkMachine}>Resolver QR</button>
 
         {machineInfo && (
@@ -135,9 +222,14 @@ export default function App() {
           <section className="checklist">
             <h2>Checklist de bloqueo</h2>
             <ul>
-              {steps.map((step, index) => (
-                <li key={step}>
-                  <input type="checkbox" defaultChecked={index === 0} /> {step}
+              {checkinPoints.map((point, index) => (
+                <li key={point.puntoBloqueoId}>
+                  <input
+                    type="checkbox"
+                    checked={point.completado}
+                    disabled={point.completado || (index > 0 && !checkinPoints[index - 1].completado)}
+                    onChange={() => completeCheckinPoint(point, index)}
+                  /> {point.puntoBloqueo?.nombre}
                 </li>
               ))}
             </ul>

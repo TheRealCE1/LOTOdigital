@@ -219,7 +219,8 @@ app.post('/api/eventos/:id/checkout', async (req, res) => {
   }
 
   const puntosCheckout = Array.isArray(puntos) ? puntos : [];
-  const checkoutValido = evento.maquina.puntos.every((punto, index) => {
+  const puntosInversos = [...evento.maquina.puntos].reverse();
+  const checkoutValido = puntosInversos.every((punto, index) => {
     const recibido = puntosCheckout[index];
     return recibido &&
       Number(recibido.puntoBloqueoId) === punto.id &&
@@ -269,7 +270,7 @@ app.post('/api/eventos/:id/checkout', async (req, res) => {
           eventoId: evento.id,
           puntoBloqueoId: Number(punto.puntoBloqueoId),
           tipo: 'CHECKOUT',
-          orden: evento.maquina.puntos.length - index,
+          orden: index + 1,
           completado: true,
           realizadoAt: new Date()
         }

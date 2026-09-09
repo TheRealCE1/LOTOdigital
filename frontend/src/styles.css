@@ -91,6 +91,19 @@ button {
   color: #1b2c78;
 }
 
+.qr-reader {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid #d9e0f2;
+  border-radius: 10px;
+  background: #111827;
+}
+
+.qr-reader video {
+  width: 100% !important;
+  border-radius: 10px;
+}
+
 .danger {
   background: #ffe5e5;
   color: #b62828;
