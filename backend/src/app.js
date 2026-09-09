@@ -7,6 +7,47 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+async function sendClosedEvent(evento, puntos) {
+  const webhookUrl = process.env.POWER_AUTOMATE_URL;
+
+  if (!webhookUrl) {
+    return { sent: false, error: null };
+  }
+
+  const payload = {
+    eventoId: String(evento.id),
+    maquina: evento.maquina.nombre,
+    linea: evento.maquina.linea.nombre,
+    numeroEmpleado: evento.operador.numeroEmpleado,
+    checkin: evento.horaInicio,
+    checkout: evento.horaFin,
+    duracionMinutos: evento.duracionMinutos,
+    puntos: puntos.map((punto) => ({
+      nombre: punto.puntoBloqueo.nombre,
+      tipoEnergia: punto.puntoBloqueo.tipoEnergia,
+      orden: punto.orden,
+      tipo: punto.tipo,
+      realizadoAt: punto.realizadoAt
+    }))
+  };
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      return { sent: false, error: `Webhook respondió HTTP ${response.status}` };
+    }
+
+    return { sent: true, error: null };
+  } catch (error) {
+    return { sent: false, error: error.message };
+  }
+}
+
 app.get('/health', (req, res) => {
   res.json({ ok: true, message: 'LOTO API funcionando' });
 });
@@ -75,39 +116,58 @@ app.post('/api/eventos/checkin', async (req, res) => {
   const eventoAbierto = await prisma.eventoLOTO.findFirst({
     where: {
       maquinaId: maquina.id,
-      operadorId: operador.id,
       estado: 'ABIERTO'
     }
   });
 
   if (eventoAbierto) {
     return res.status(409).json({
-      error: 'Ya existe un LOTO abierto para esta máquina y operador',
+      error: 'La máquina ya tiene un LOTO abierto',
       eventoId: eventoAbierto.id
     });
   }
 
-  const evento = await prisma.eventoLOTO.create({
-    data: {
-      maquinaId: maquina.id,
-      operadorId: operador.id,
-      estado: 'ABIERTO',
-      horaInicio: new Date(),
-      puntos: {
-        create: maquina.puntos.map((punto) => ({
-          puntoBloqueoId: punto.id,
-          tipo: 'CHECKIN',
-          orden: punto.orden,
-          completado: false
-        }))
-      }
-    },
-    include: {
-      maquina: { include: { linea: true } },
-      operador: true,
-      puntos: { include: { puntoBloqueo: true } }
+  let evento;
+
+  try {
+    evento = await prisma.$transaction(async (tx) => {
+      const nuevoEvento = await tx.eventoLOTO.create({
+        data: {
+          maquinaId: maquina.id,
+          operadorId: operador.id,
+          estado: 'ABIERTO',
+          horaInicio: new Date(),
+          puntos: {
+            create: maquina.puntos.map((punto) => ({
+              puntoBloqueoId: punto.id,
+              tipo: 'CHECKIN',
+              orden: punto.orden,
+              completado: false
+            }))
+          }
+        }
+      });
+
+      await tx.bloqueoMaquina.create({
+        data: { maquinaId: maquina.id, eventoId: nuevoEvento.id }
+      });
+
+      return tx.eventoLOTO.findUnique({
+        where: { id: nuevoEvento.id },
+        include: {
+          maquina: { include: { linea: true } },
+          operador: true,
+          puntos: { include: { puntoBloqueo: true } }
+        }
+      });
+    });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      return res.status(409).json({ error: 'La máquina ya tiene un LOTO abierto' });
     }
-  });
+
+    throw error;
+  }
 
   res.status(201).json({
     message: 'LOTO abierto correctamente',
@@ -253,6 +313,8 @@ app.post('/api/eventos/:id/checkout', async (req, res) => {
     }
     });
 
+    await tx.bloqueoMaquina.deleteMany({ where: { eventoId: evento.id } });
+
     for (const [index, punto] of puntosCheckout.entries()) {
       await tx.eventoPunto.upsert({
         where: {
@@ -280,6 +342,20 @@ app.post('/api/eventos/:id/checkout', async (req, res) => {
     return cerrado;
   });
 
+  const puntosCerrados = await prisma.eventoPunto.findMany({
+    where: { eventoId: evento.id },
+    include: { puntoBloqueo: true },
+    orderBy: { orden: 'asc' }
+  });
+  const integracion = await sendClosedEvent(eventoCerrado, puntosCerrados);
+  await prisma.eventoLOTO.update({
+    where: { id: evento.id },
+    data: {
+      integracionEnviada: integracion.sent,
+      integracionError: integracion.error
+    }
+  });
+
   res.json({
     message: 'Evento cerrado correctamente',
     evento: eventoCerrado,
@@ -290,7 +366,8 @@ app.post('/api/eventos/:id/checkout', async (req, res) => {
       numeroEmpleado: eventoCerrado.operador.numeroEmpleado,
       checkin: eventoCerrado.horaInicio,
       checkout: eventoCerrado.horaFin,
-      duracionMinutos
+      duracionMinutos,
+      integracionEnviada: integracion.sent
     }
   });
 });

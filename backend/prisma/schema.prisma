@@ -14,21 +14,23 @@ model Linea {
 }
 
 model Maquina {
-  id         Int             @id @default(autoincrement())
-  nombre     String
-  qrCode     String          @unique
-  lineaId    Int
-  linea      Linea           @relation(fields: [lineaId], references: [id])
-  puntos     PuntoBloqueo[]
-  eventos    EventoLOTO[]
+  id             Int              @id @default(autoincrement())
+  nombre         String
+  qrCode         String           @unique
+  lineaId        Int
+  linea          Linea            @relation(fields: [lineaId], references: [id])
+  puntos         PuntoBloqueo[]
+  eventos        EventoLOTO[]
+  bloqueoActivo  BloqueoMaquina?
 }
 
 model PuntoBloqueo {
-  id         Int          @id @default(autoincrement())
-  nombre     String
-  orden      Int
-  maquinaId  Int
-  maquina    Maquina      @relation(fields: [maquinaId], references: [id])
+  id            Int             @id @default(autoincrement())
+  nombre        String
+  tipoEnergia   TipoEnergia    @default(OTRA)
+  orden         Int
+  maquinaId     Int
+  maquina       Maquina         @relation(fields: [maquinaId], references: [id])
   eventoPuntos EventoPunto[]
 
   @@unique([maquinaId, orden])
@@ -54,6 +56,18 @@ model EventoLOTO {
   maquina          Maquina      @relation(fields: [maquinaId], references: [id])
   operador         Operador     @relation(fields: [operadorId], references: [id])
   puntos           EventoPunto[]
+  bloqueoActivo    BloqueoMaquina?
+  integracionEnviada Boolean     @default(false)
+  integracionError   String?
+}
+
+model BloqueoMaquina {
+  id        Int        @id @default(autoincrement())
+  maquinaId Int        @unique
+  eventoId  Int        @unique
+  maquina   Maquina    @relation(fields: [maquinaId], references: [id])
+  evento    EventoLOTO @relation(fields: [eventoId], references: [id])
+  creadoAt  DateTime   @default(now())
 }
 
 model EventoPunto {
@@ -78,4 +92,13 @@ enum EstadoEvento {
 enum TipoEventoPunto {
   CHECKIN
   CHECKOUT
+}
+
+enum TipoEnergia {
+  ELECTRICA
+  NEUMATICA
+  HIDRAULICA
+  GRAVEDAD
+  MECANICA
+  OTRA
 }

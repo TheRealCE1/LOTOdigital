@@ -20,12 +20,12 @@ async function main() {
   });
 
   const puntos = [
-    'Bloquear breaker principal',
-    'Cerrar válvula neumática',
-    'Cerrar válvula hidráulica'
+    { nombre: 'Bloquear breaker principal', tipoEnergia: 'ELECTRICA' },
+    { nombre: 'Cerrar válvula neumática', tipoEnergia: 'NEUMATICA' },
+    { nombre: 'Cerrar válvula hidráulica', tipoEnergia: 'HIDRAULICA' }
   ];
 
-  for (const [index, nombre] of puntos.entries()) {
+  for (const [index, punto] of puntos.entries()) {
     await prisma.puntoBloqueo.upsert({
       where: {
         maquinaId_orden: {
@@ -33,9 +33,10 @@ async function main() {
           orden: index + 1
         }
       },
-      update: { nombre },
+      update: { nombre: punto.nombre, tipoEnergia: punto.tipoEnergia },
       create: {
-        nombre,
+        nombre: punto.nombre,
+        tipoEnergia: punto.tipoEnergia,
         orden: index + 1,
         maquinaId: maquina.id
       }

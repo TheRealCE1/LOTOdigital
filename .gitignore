@@ -1,6 +1,7 @@
 node_modules/
 frontend/dist/
 backend/.env
+frontend/.env
 backend/prisma/*.db
 backend/prisma/migrations/
 .DS_Store

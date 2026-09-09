@@ -12,6 +12,6 @@
     "start": "npm --workspace backend run start"
   },
   "devDependencies": {
-    "concurrently": "^10.0.5"
+    "concurrently": "^9.2.1"
   }
 }

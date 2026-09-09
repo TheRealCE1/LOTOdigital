@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 
-const API_URL = 'http://localhost:4000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
 const initialMachine = {
   qrCode: 'QR-P12',
@@ -229,7 +229,7 @@ export default function App() {
                     checked={point.completado}
                     disabled={point.completado || (index > 0 && !checkinPoints[index - 1].completado)}
                     onChange={() => completeCheckinPoint(point, index)}
-                  /> {point.puntoBloqueo?.nombre}
+                  /> {point.puntoBloqueo?.nombre} ({point.puntoBloqueo?.tipoEnergia || 'OTRA'})
                 </li>
               ))}
             </ul>
