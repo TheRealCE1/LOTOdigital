@@ -121,9 +121,32 @@ app.post('/api/eventos/checkin', async (req, res) => {
   });
 
   if (eventoAbierto) {
+    if (eventoAbierto.operadorId === operador.id) {
+      const eventoActivo = await prisma.eventoLOTO.findUnique({
+        where: { id: eventoAbierto.id },
+        include: {
+          maquina: { include: { linea: true } },
+          operador: true,
+          puntos: {
+            include: { puntoBloqueo: true },
+            orderBy: { orden: 'asc' }
+          }
+        }
+      });
+
+      return res.status(200).json({
+        message: 'LOTO abierto recuperado',
+        resumed: true,
+        evento: eventoActivo,
+        maquina,
+        operador
+      });
+    }
+
     return res.status(409).json({
       error: 'La máquina ya tiene un LOTO abierto',
-      eventoId: eventoAbierto.id
+      eventoId: eventoAbierto.id,
+      operadorActivo: eventoAbierto.operadorId
     });
   }
 
