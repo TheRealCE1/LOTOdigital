@@ -1,9 +1,18 @@
 :root {
-  font-family: Inter, system-ui, sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #1f2937;
-  background: #eef3ff;
+  color: #17213b;
+  background: #dce7f7;
+  --ink: #17213b;
+  --muted: #596985;
+  --blue: #315bea;
+  --blue-deep: #1f3fb5;
+  --surface: rgba(244, 248, 255, 0.68);
+  --surface-solid: #e7eef9;
+  --line: rgba(255, 255, 255, 0.72);
+  --shadow-light: rgba(255, 255, 255, 0.9);
+  --shadow-dark: rgba(101, 126, 168, 0.28);
 }
 
 * {
@@ -13,7 +22,9 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: linear-gradient(180deg, #eef3ff 0%, #f7f8fb 100%);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.52), transparent 42%),
+    linear-gradient(145deg, #d6e3f4 0%, #eef4fb 54%, #d6e2f2 100%);
 }
 
 button,
@@ -28,7 +39,7 @@ input {
 .app-shell {
   max-width: 520px;
   margin: 0 auto;
-  padding: 24px 16px 40px;
+  padding: 32px 16px 48px;
 }
 
 .topbar {
@@ -36,7 +47,7 @@ input {
 }
 
 .eyebrow {
-  color: #4857ef;
+  color: var(--blue-deep);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 12px;
@@ -47,16 +58,46 @@ input {
 h1 {
   margin: 0;
   font-size: 2rem;
+  letter-spacing: 0.01em;
 }
 
 .card {
-  background: white;
-  border-radius: 18px;
-  box-shadow: 0 14px 32px rgba(31, 58, 150, 0.08);
-  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow:
+    18px 18px 36px var(--shadow-dark),
+    -18px -18px 36px var(--shadow-light),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.8);
+  -webkit-backdrop-filter: blur(22px);
+  backdrop-filter: blur(22px);
+  padding: 22px;
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+.mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 4px;
+  background: rgba(209, 222, 241, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 14px;
+  box-shadow: inset 3px 3px 7px rgba(119, 143, 181, 0.2), inset -3px -3px 7px rgba(255, 255, 255, 0.7);
+}
+
+.mode-button {
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.mode-button.active {
+  background: linear-gradient(145deg, #3b68f1, #294fcf);
+  color: white;
+  box-shadow: 4px 4px 9px rgba(79, 104, 157, 0.28), -3px -3px 8px rgba(255, 255, 255, 0.44);
 }
 
 label {
@@ -67,34 +108,54 @@ label {
 }
 
 input {
-  border: 1px solid #d9e0f2;
-  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  border-radius: 12px;
   padding: 12px 14px;
-  background: #f9faff;
+  color: var(--ink);
+  background: rgba(225, 234, 247, 0.8);
+  box-shadow: inset 4px 4px 9px rgba(126, 148, 181, 0.2), inset -4px -4px 9px rgba(255, 255, 255, 0.72);
+}
+
+input:focus {
+  outline: 2px solid rgba(49, 91, 234, 0.34);
+  outline-offset: 2px;
 }
 
 button {
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 12px 14px;
   font-weight: 700;
   cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 3px 3px 7px rgba(83, 106, 153, 0.28), inset -3px -3px 7px rgba(255, 255, 255, 0.36);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
 }
 
 .primary {
-  background: #2f5cff;
+  background: linear-gradient(145deg, #3b68f1, #294fcf);
   color: white;
+  box-shadow: 6px 6px 12px rgba(79, 104, 157, 0.34), -5px -5px 11px rgba(255, 255, 255, 0.58);
 }
 
 .secondary {
-  background: #ebf0ff;
-  color: #1b2c78;
+  background: var(--surface-solid);
+  color: #203a8d;
+  box-shadow: 5px 5px 10px rgba(108, 132, 172, 0.25), -5px -5px 10px rgba(255, 255, 255, 0.75);
 }
 
 .qr-reader {
   width: 100%;
   overflow: hidden;
-  border: 1px solid #d9e0f2;
+  border: 1px solid rgba(255, 255, 255, 0.62);
   border-radius: 10px;
   background: #111827;
 }
@@ -105,15 +166,18 @@ button {
 }
 
 .danger {
-  background: #ffe5e5;
-  color: #b62828;
+  background: #f4dfe3;
+  color: #a2253a;
+  box-shadow: 5px 5px 10px rgba(155, 101, 112, 0.2), -5px -5px 10px rgba(255, 255, 255, 0.7);
 }
 
 .machine-box {
-  background: #f4f7ff;
-  border-radius: 10px;
+  background: rgba(224, 234, 248, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 14px;
   padding: 12px 14px;
   color: #2a3b65;
+  box-shadow: inset 3px 3px 8px rgba(125, 148, 182, 0.16), inset -3px -3px 8px rgba(255, 255, 255, 0.72);
 }
 
 .machine-box p {
@@ -121,8 +185,57 @@ button {
 }
 
 .checklist {
-  border-top: 1px solid #e8edf7;
+  border-top: 1px solid rgba(255, 255, 255, 0.72);
   padding-top: 14px;
+}
+
+.resume-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.72);
+  padding-top: 14px;
+}
+
+.catalog-menu {
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(230, 238, 249, 0.58);
+  box-shadow: inset 3px 3px 8px rgba(125, 148, 182, 0.12), inset -3px -3px 8px rgba(255, 255, 255, 0.64);
+}
+
+.catalog-menu summary {
+  cursor: pointer;
+  color: #203a8d;
+  font-weight: 700;
+}
+
+.catalog-menu .resume-section {
+  margin-top: 12px;
+}
+
+.resume-section h2 {
+  font-size: 1.1rem;
+  margin: 0 0 14px;
+}
+
+.session-list {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.session-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 12px;
+  background: rgba(225, 234, 247, 0.54);
+  box-shadow: 4px 4px 9px rgba(108, 132, 172, 0.16), -4px -4px 9px rgba(255, 255, 255, 0.62);
 }
 
 .checklist ul {
@@ -142,6 +255,6 @@ button {
 
 .error {
   margin: 0;
-  color: #b72f2f;
+  color: #a2253a;
   font-weight: 600;
 }

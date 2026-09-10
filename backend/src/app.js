@@ -48,6 +48,10 @@ async function sendClosedEvent(evento, puntos) {
   }
 }
 
+function normalizeEmployeeNumber(value) {
+  return String(value || '').trim();
+}
+
 app.get('/health', (req, res) => {
   res.json({ ok: true, message: 'LOTO API funcionando' });
 });
@@ -58,6 +62,74 @@ app.get('/api/lineas', async (req, res) => {
   });
 
   res.json(lineas);
+});
+
+app.post('/api/catalogo/maquinas', async (req, res) => {
+  const { nombre, linea, qrCode, puntos = [] } = req.body;
+
+  if (!nombre || !linea || !qrCode) {
+    return res.status(400).json({
+      error: 'nombre, linea y qrCode son obligatorios'
+    });
+  }
+
+  const puntosValidos = Array.isArray(puntos) && puntos.length > 0
+    ? puntos
+    : [{ nombre: 'Bloqueo general', tipoEnergia: 'OTRA' }];
+
+  try {
+    const maquina = await prisma.$transaction(async (tx) => {
+      const lineaRegistro = await tx.linea.upsert({
+        where: { nombre: String(linea).trim() },
+        update: {},
+        create: { nombre: String(linea).trim() }
+      });
+
+      const maquinaRegistro = await tx.maquina.upsert({
+        where: { qrCode: String(qrCode).trim() },
+        update: { nombre: String(nombre).trim(), lineaId: lineaRegistro.id },
+        create: {
+          nombre: String(nombre).trim(),
+          qrCode: String(qrCode).trim(),
+          lineaId: lineaRegistro.id
+        }
+      });
+
+      for (const [index, punto] of puntosValidos.entries()) {
+        await tx.puntoBloqueo.upsert({
+          where: {
+            maquinaId_orden: {
+              maquinaId: maquinaRegistro.id,
+              orden: index + 1
+            }
+          },
+          update: {
+            nombre: String(punto.nombre || `Punto ${index + 1}`).trim(),
+            tipoEnergia: punto.tipoEnergia || 'OTRA'
+          },
+          create: {
+            nombre: String(punto.nombre || `Punto ${index + 1}`).trim(),
+            tipoEnergia: punto.tipoEnergia || 'OTRA',
+            orden: index + 1,
+            maquinaId: maquinaRegistro.id
+          }
+        });
+      }
+
+      return tx.maquina.findUnique({
+        where: { id: maquinaRegistro.id },
+        include: { linea: true, puntos: { orderBy: { orden: 'asc' } } }
+      });
+    });
+
+    return res.status(201).json({ message: 'Máquina registrada', maquina });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      return res.status(409).json({ error: 'El QR ya está registrado' });
+    }
+
+    throw error;
+  }
 });
 
 app.get('/api/maquinas/:qrCode', async (req, res) => {
@@ -87,8 +159,36 @@ app.get('/api/eventos/activos', async (req, res) => {
   res.json(eventos);
 });
 
+app.post('/api/eventos/reanudar', async (req, res) => {
+  const numeroEmpleado = normalizeEmployeeNumber(req.body.numeroEmpleado);
+
+  if (!numeroEmpleado) {
+    return res.status(400).json({ error: 'numeroEmpleado es obligatorio' });
+  }
+
+  const eventos = await prisma.eventoLOTO.findMany({
+    where: { estado: 'ABIERTO' },
+    include: {
+      maquina: { include: { linea: true } },
+      operador: true,
+      puntos: {
+        include: { puntoBloqueo: true },
+        orderBy: { orden: 'asc' }
+      }
+    },
+    orderBy: { horaInicio: 'desc' }
+  });
+
+  res.json({
+    eventos: eventos.filter((evento) =>
+      normalizeEmployeeNumber(evento.operador.numeroEmpleado) === numeroEmpleado
+    )
+  });
+});
+
 app.post('/api/eventos/checkin', async (req, res) => {
-  const { qrCode, numeroEmpleado } = req.body;
+  const qrCode = String(req.body.qrCode || '').trim();
+  const numeroEmpleado = normalizeEmployeeNumber(req.body.numeroEmpleado);
 
   if (!qrCode || !numeroEmpleado) {
     return res.status(400).json({ error: 'qrCode y numeroEmpleado son obligatorios' });
@@ -113,15 +213,15 @@ app.post('/api/eventos/checkin', async (req, res) => {
     });
   }
 
-  const eventoAbierto = await prisma.eventoLOTO.findFirst({
-    where: {
-      maquinaId: maquina.id,
-      estado: 'ABIERTO'
-    }
+  const eventosAbiertos = await prisma.eventoLOTO.findMany({
+    where: { maquinaId: maquina.id, estado: 'ABIERTO' },
+    include: { operador: true },
+    orderBy: { horaInicio: 'desc' }
   });
+  const eventoAbierto = eventosAbiertos[0];
 
   if (eventoAbierto) {
-    if (eventoAbierto.operadorId === operador.id) {
+    if (normalizeEmployeeNumber(eventoAbierto.operador.numeroEmpleado) === numeroEmpleado) {
       const eventoActivo = await prisma.eventoLOTO.findUnique({
         where: { id: eventoAbierto.id },
         include: {
@@ -146,7 +246,7 @@ app.post('/api/eventos/checkin', async (req, res) => {
     return res.status(409).json({
       error: 'La máquina ya tiene un LOTO abierto',
       eventoId: eventoAbierto.id,
-      operadorActivo: eventoAbierto.operadorId
+      operadorActivo: eventoAbierto.operador.numeroEmpleado
     });
   }
 
@@ -229,14 +329,23 @@ app.post('/api/eventos/:id/checkpoint', async (req, res) => {
     return res.status(400).json({ error: 'El punto no pertenece a la máquina del evento' });
   }
 
-  if (completado && tipo === 'CHECKIN') {
-    const anterior = evento.maquina.puntos.find((item) => item.orden === punto.orden - 1);
+  if (completado) {
+    const puntosOrdenados = tipo === 'CHECKIN'
+      ? evento.maquina.puntos
+      : [...evento.maquina.puntos].reverse();
+    const indiceActual = puntosOrdenados.findIndex((item) => item.id === punto.id);
+    const anterior = puntosOrdenados[indiceActual - 1];
+    const tipoAnterior = tipo;
     const anteriorEvento = anterior && evento.puntos.find(
-      (item) => item.puntoBloqueoId === anterior.id && item.tipo === 'CHECKIN'
+      (item) => item.puntoBloqueoId === anterior.id && item.tipo === tipoAnterior
     );
 
     if (anterior && !anteriorEvento?.completado) {
-      return res.status(409).json({ error: 'Debes completar primero el punto anterior' });
+      return res.status(409).json({
+        error: tipo === 'CHECKIN'
+          ? 'Debes completar primero el punto anterior'
+          : 'Debes retirar primero el bloqueo anterior en orden inverso'
+      });
     }
   }
 
@@ -260,7 +369,9 @@ app.post('/api/eventos/:id/checkpoint', async (req, res) => {
       eventoId: Number(req.params.id),
       puntoBloqueoId: Number(puntoBloqueoId),
       tipo,
-      orden: 0,
+      orden: tipo === 'CHECKIN'
+        ? punto.orden
+        : evento.maquina.puntos.length - punto.orden + 1,
       completado,
       realizadoAt: completado ? new Date() : null
     }
@@ -270,8 +381,6 @@ app.post('/api/eventos/:id/checkpoint', async (req, res) => {
 });
 
 app.post('/api/eventos/:id/checkout', async (req, res) => {
-  const { puntos } = req.body;
-
   const evento = await prisma.eventoLOTO.findUnique({
     where: { id: Number(req.params.id) },
     include: {
@@ -301,18 +410,18 @@ app.post('/api/eventos/:id/checkout', async (req, res) => {
     return res.status(409).json({ error: 'No puedes cerrar el evento con el checklist de bloqueo incompleto' });
   }
 
-  const puntosCheckout = Array.isArray(puntos) ? puntos : [];
   const puntosInversos = [...evento.maquina.puntos].reverse();
-  const checkoutValido = puntosInversos.every((punto, index) => {
-    const recibido = puntosCheckout[index];
-    return recibido &&
-      Number(recibido.puntoBloqueoId) === punto.id &&
-      Boolean(recibido.completado);
-  });
+  const checkoutCompleto = puntosInversos.every((punto) =>
+    evento.puntos.some(
+      (eventoPunto) => eventoPunto.puntoBloqueoId === punto.id &&
+        eventoPunto.tipo === 'CHECKOUT' &&
+        eventoPunto.completado
+    )
+  );
 
-  if (!checkoutValido || puntosCheckout.length !== evento.maquina.puntos.length) {
+  if (!checkoutCompleto) {
     return res.status(409).json({
-      error: 'Completa el checklist de desbloqueo en orden inverso'
+      error: 'Confirma físicamente todos los puntos de desbloqueo en orden inverso'
     });
   }
 
@@ -337,30 +446,6 @@ app.post('/api/eventos/:id/checkout', async (req, res) => {
     });
 
     await tx.bloqueoMaquina.deleteMany({ where: { eventoId: evento.id } });
-
-    for (const [index, punto] of puntosCheckout.entries()) {
-      await tx.eventoPunto.upsert({
-        where: {
-          eventoId_puntoBloqueoId_tipo: {
-            eventoId: evento.id,
-            puntoBloqueoId: Number(punto.puntoBloqueoId),
-            tipo: 'CHECKOUT'
-          }
-        },
-        update: {
-          completado: Boolean(punto.completado),
-          realizadoAt: Boolean(punto.completado) ? new Date() : null
-        },
-        create: {
-          eventoId: evento.id,
-          puntoBloqueoId: Number(punto.puntoBloqueoId),
-          tipo: 'CHECKOUT',
-          orden: index + 1,
-          completado: true,
-          realizadoAt: new Date()
-        }
-      });
-    }
 
     return cerrado;
   });
@@ -392,6 +477,44 @@ app.post('/api/eventos/:id/checkout', async (req, res) => {
       duracionMinutos,
       integracionEnviada: integracion.sent
     }
+  });
+});
+
+app.post('/api/eventos/:id/integracion/reintentar', async (req, res) => {
+  const evento = await prisma.eventoLOTO.findUnique({
+    where: { id: Number(req.params.id) },
+    include: {
+      maquina: { include: { linea: true } },
+      operador: true,
+      puntos: { include: { puntoBloqueo: true }, orderBy: { orden: 'asc' } }
+    }
+  });
+
+  if (!evento) {
+    return res.status(404).json({ error: 'Evento no encontrado' });
+  }
+
+  if (evento.estado !== 'CERRADO') {
+    return res.status(409).json({ error: 'Solo se puede reintentar un evento cerrado' });
+  }
+
+  if (evento.integracionEnviada) {
+    return res.json({ message: 'La integración ya fue enviada', integracionEnviada: true });
+  }
+
+  const integracion = await sendClosedEvent(evento, evento.puntos);
+  const actualizado = await prisma.eventoLOTO.update({
+    where: { id: evento.id },
+    data: {
+      integracionEnviada: integracion.sent,
+      integracionError: integracion.error
+    }
+  });
+
+  return res.status(integracion.sent ? 200 : 502).json({
+    message: integracion.sent ? 'Integración enviada correctamente' : 'No se pudo enviar la integración',
+    integracionEnviada: actualizado.integracionEnviada,
+    integracionError: actualizado.integracionError
   });
 });
 
