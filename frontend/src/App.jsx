@@ -309,8 +309,8 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">LOTO Digital</p>
-          <h1>Check-in de máquina</h1>
+          <p className="eyebrow">Smart Factory</p>
+          <h1>Registro de LOTO</h1>
         </div>
       </header>
 
