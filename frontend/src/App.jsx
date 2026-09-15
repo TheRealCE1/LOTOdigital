@@ -346,12 +346,74 @@ export default function App() {
               QR
               <input value={catalogMachine.qrCode} onChange={(e) => setCatalogMachine({ ...catalogMachine, qrCode: e.target.value })} placeholder="Ej. A8-M01" />
             </label>
-            <label>
-              Punto de bloqueo
-              <input value={catalogPoints[0].nombre} onChange={(e) => setCatalogPoints([{ ...catalogPoints[0], nombre: e.target.value }])} placeholder="Ej. Breaker principal" />
-            </label>
-            <button className="secondary" onClick={registerMachine}>Registrar máquina</button>
-            {catalogMessage && <p className="status-message">{catalogMessage}</p>}
+            <label>Puntos de bloqueo</label>
+
+          {catalogPoints.map((point, index) => (
+            <div key={index} className="lock-point-row">
+              <input
+                value={point.nombre}
+                onChange={(e) => {
+                  const updated = [...catalogPoints];
+                  updated[index] = {
+                    ...updated[index],
+                    nombre: e.target.value
+                  };
+                  setCatalogPoints(updated);
+                }}
+                placeholder={`Punto de bloqueo ${index + 1}`}
+              />
+
+              <select
+                value={point.tipoEnergia}
+                onChange={(e) => {
+                  const updated = [...catalogPoints];
+                  updated[index] = {
+                    ...updated[index],
+                    tipoEnergia: e.target.value
+                  };
+                  setCatalogPoints(updated);
+                }}
+              >
+                <option value="ELECTRICA">Eléctrica</option>
+                <option value="NEUMATICA">Neumática</option>
+                <option value="HIDRAULICA">Hidráulica</option>
+                <option value="MECANICA">Mecánica</option>
+                <option value="OTRA">Otra</option>
+              </select>
+
+              {catalogPoints.length > 1 && (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => {
+                    setCatalogPoints(
+                      catalogPoints.filter((_, i) => i !== index)
+                    );
+                  }}
+                >
+                  Eliminar
+                </button>
+              )}
+            </div>
+          ))}
+
+          <button
+            type="button"
+            className="secondary"
+            onClick={() =>
+              setCatalogPoints([
+                ...catalogPoints,
+                {
+                  nombre: '',
+                  tipoEnergia: 'OTRA'
+                }
+              ])
+            }
+          >
+            + Agregar punto de bloqueo
+          </button>
+          <button className="secondary" onClick={registerMachine}>Registrar máquina</button>
+          {catalogMessage && <p className="status-message">{catalogMessage}</p>}
           </section>
         </details>
 
