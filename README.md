@@ -1,5 +1,24 @@
 # LOTO Digital — Documentación Técnica
 
+## Deploy en Railway
+
+Este repositorio despliega frontend y backend como un solo servicio. Railway debe usar la raíz del repositorio y leer [railway.json](railway.json).
+
+Variables requeridas en Railway:
+
+```env
+DATABASE_URL=file:./loto.db
+POWER_AUTOMATE_URL=
+```
+
+El `buildCommand` compila el frontend y sincroniza SQLite. El servidor arranca con `node src/server.js` y escucha el puerto que Railway entrega mediante `PORT`. El healthcheck es:
+
+```text
+/health
+```
+
+No uses `npm run dev`, `vite` ni `node dev start` como Start Command en Railway.
+
 Sistema de digitalización del proceso de bloqueo y etiquetado (LOTO — *Lockout/Tagout*) para máquinas industriales. Permite a un operador escanear el código QR de una máquina, seguir un checklist de bloqueo forzado por orden (check‑in), realizar el trabajo, y luego seguir el checklist de desbloqueo en orden inverso (check‑out), quedando el evento registrado y enviado por webhook a un dashboard externo.
 
 ---

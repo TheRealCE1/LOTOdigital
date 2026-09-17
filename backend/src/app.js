@@ -1,11 +1,13 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('node:path');
 const prisma = require('./lib/prisma');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, '../../frontend/dist')));
 
 async function sendClosedEvent(evento, puntos) {
   const webhookUrl = process.env.POWER_AUTOMATE_URL;
@@ -515,6 +517,13 @@ app.post('/api/eventos/:id/integracion/reintentar', async (req, res) => {
     message: integracion.sent ? 'Integración enviada correctamente' : 'No se pudo enviar la integración',
     integracionEnviada: actualizado.integracionEnviada,
     integracionError: actualizado.integracionError
+  });
+});
+
+app.get(/^\/(?!api(?:\/|$)|health$).*/, (req, res, next) => {
+  const indexPath = path.join(__dirname, '../../frontend/dist/index.html');
+  res.sendFile(indexPath, (error) => {
+    if (error) next(error);
   });
 });
 
