@@ -1,7 +1,7 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "buildCommand": "npm run build && npm --workspace backend run db:push"
+    "buildCommand": "DATABASE_URL=${DATABASE_URL:-file:./loto.db} npm run build && DATABASE_URL=${DATABASE_URL:-file:./loto.db} npm --workspace backend run db:push"
   },
   "deploy": {
     "startCommand": "npm start",

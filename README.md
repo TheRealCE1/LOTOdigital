@@ -11,6 +11,8 @@ DATABASE_URL=file:./loto.db
 POWER_AUTOMATE_URL=
 ```
 
+Si `DATABASE_URL` no está definida, el build y el servidor usan automáticamente `file:./loto.db`. Para conservar SQLite entre redeploys, configura un volumen y define `DATABASE_URL` apuntando a la ruta persistente.
+
 El `buildCommand` compila el frontend y sincroniza SQLite. El servidor arranca con `node src/server.js` y escucha el puerto que Railway entrega mediante `PORT`. El healthcheck es:
 
 ```text
