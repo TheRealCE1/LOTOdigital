@@ -1,0 +1,14 @@
+{
+  "name": "LOTO Digital",
+  "short_name": "LOTO",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#eef3ff",
+  "theme_color": "#1f4cf1",
+  "icons": [{
+    "src": "/icon.svg",
+    "sizes": "any",
+    "type": "image/svg+xml",
+    "purpose": "any maskable"
+  }]
+}

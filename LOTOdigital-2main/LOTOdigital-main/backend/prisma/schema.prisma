@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Linea {
+  id       Int       @id @default(autoincrement())
+  nombre   String    @unique
+  maquinas Maquina[]
+}
+
+model Maquina {
+  id             Int              @id @default(autoincrement())
+  nombre         String
+  qrCode         String           @unique
+  lineaId        Int
+  linea          Linea            @relation(fields: [lineaId], references: [id])
+  puntos         PuntoBloqueo[]
+  eventos        EventoLOTO[]
+  bloqueoActivo  BloqueoMaquina?
+}
+
+model PuntoBloqueo {
+  id            Int             @id @default(autoincrement())
+  nombre        String
+  tipoEnergia   TipoEnergia    @default(OTRA)
+  orden         Int
+  maquinaId     Int
+  maquina       Maquina         @relation(fields: [maquinaId], references: [id])
+  eventoPuntos EventoPunto[]
+
+  @@unique([maquinaId, orden])
+}
+
+model Operador {
+  id             Int         @id @default(autoincrement())
+  numeroEmpleado String      @unique
+  eventos        EventoLOTO[]
+}
+
+model EventoLOTO {
+  id               Int          @id @default(autoincrement())
+  maquinaId        Int
+  operadorId       Int
+  estado           EstadoEvento @default(ABIERTO)
+  horaInicio       DateTime     @default(now())
+  horaFin          DateTime?
+  duracionMinutos  Int?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  maquina          Maquina      @relation(fields: [maquinaId], references: [id])
+  operador         Operador     @relation(fields: [operadorId], references: [id])
+  puntos           EventoPunto[]
+  bloqueoActivo    BloqueoMaquina?
+  integracionEnviada Boolean     @default(false)
+  integracionError   String?
+}
+
+model BloqueoMaquina {
+  id        Int        @id @default(autoincrement())
+  maquinaId Int        @unique
+  eventoId  Int        @unique
+  maquina   Maquina    @relation(fields: [maquinaId], references: [id])
+  evento    EventoLOTO @relation(fields: [eventoId], references: [id])
+  creadoAt  DateTime   @default(now())
+}
+
+model EventoPunto {
+  id            Int          @id @default(autoincrement())
+  eventoId      Int
+  puntoBloqueoId Int
+  tipo          TipoEventoPunto
+  orden         Int
+  completado    Boolean      @default(false)
+  realizadoAt   DateTime?
+  evento        EventoLOTO   @relation(fields: [eventoId], references: [id])
+  puntoBloqueo  PuntoBloqueo @relation(fields: [puntoBloqueoId], references: [id])
+
+  @@unique([eventoId, puntoBloqueoId, tipo])
+}
+
+enum EstadoEvento {
+  ABIERTO
+  CERRADO
+}
+
+enum TipoEventoPunto {
+  CHECKIN
+  CHECKOUT
+}
+
+enum TipoEnergia {
+  ELECTRICA
+  NEUMATICA
+  HIDRAULICA
+  GRAVEDAD
+  MECANICA
+  OTRA
+}
