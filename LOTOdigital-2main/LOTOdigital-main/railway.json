@@ -1,0 +1,11 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "buildCommand": "DATABASE_URL=${DATABASE_URL:-file:./loto.db} npm run build && DATABASE_URL=${DATABASE_URL:-file:./loto.db} npm --workspace backend run db:push"
+  },
+  "deploy": {
+    "startCommand": "npm start",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 120
+  }
+}
