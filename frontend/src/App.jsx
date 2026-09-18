@@ -39,11 +39,26 @@ export default function App() {
     });
   }
 
+  function energyImage(type) {
+    return `/energy/${String(type || 'OTRA').toLowerCase()}.svg`;
+  }
+
   useEffect(() => {
     if (!scannerOpen) return undefined;
 
     const scanner = new Html5Qrcode('qr-reader');
     let active = true;
+    let stopPromise;
+
+    function stopScanner() {
+      if (!stopPromise) {
+        stopPromise = scanner.stop()
+          .then(() => scanner.clear())
+          .catch(() => {});
+      }
+
+      return stopPromise;
+    }
 
     scanner.start(
       { facingMode: 'environment' },
@@ -53,6 +68,7 @@ export default function App() {
 
         active = false;
         const scannedQr = extractQrCode(decodedText);
+        await stopScanner();
         setQrCode(scannedQr);
         setScannerOpen(false);
 
@@ -71,44 +87,19 @@ export default function App() {
           setError('No se pudo conectar con el backend');
         }
 
-        scanner.stop().catch(() => {});
       },
       () => {}
     ).catch(() => {
+      if (!active) return;
       setScannerOpen(false);
       setError('No se pudo acceder a la cámara. Revisa los permisos.');
     });
 
     return () => {
       active = false;
-      scanner.stop().catch(() => {});
+      stopScanner();
     };
   }, [scannerOpen]);
-
-  async function checkMachine() {
-    const scannedQr = extractQrCode(qrCode);
-
-    if (!scannedQr) {
-      setError('Primero escanea o introduce un QR');
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API_URL}/maquinas/${encodeURIComponent(scannedQr)}`);
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data?.error || 'No se pudo resolver la máquina');
-        return;
-      }
-
-      setQrCode(scannedQr);
-      setResolvedMachine(data);
-      setError('');
-    } catch (err) {
-      setError('No se pudo conectar con el backend');
-    }
-  }
 
   async function registerMachine() {
     if (!catalogMachine.nombre.trim() || !catalogMachine.linea.trim() || !catalogMachine.qrCode.trim()) {
@@ -230,6 +221,14 @@ export default function App() {
       const data = await res.json();
 
       if (!res.ok) {
+        if (res.status === 409 && data?.error === 'El evento ya está cerrado') {
+          setEvent(null);
+          setCheckinPoints([]);
+          setCheckoutPoints([]);
+          setMode('checkout');
+          setError('Esta sesión ya fue cerrada. Busca otra sesión activa.');
+          return;
+        }
         setError(data?.error || 'No se pudo registrar el retiro');
         return;
       }
@@ -264,6 +263,14 @@ export default function App() {
       const data = await res.json();
 
       if (!res.ok) {
+        if (res.status === 409 && data?.error === 'El evento ya está cerrado') {
+          setEvent(null);
+          setCheckinPoints([]);
+          setCheckoutPoints([]);
+          setMode('checkout');
+          setError('Esta sesión ya fue cerrada. Busca otra sesión activa.');
+          return;
+        }
         setError(data?.error || 'No se pudo completar el punto');
         return;
       }
@@ -328,11 +335,15 @@ export default function App() {
           >
             Check-out
           </button>
+          <button
+            className={mode === 'catalog' ? 'mode-button active' : 'mode-button'}
+            onClick={() => { setMode('catalog'); setEvent(null); setError(''); }}
+          >
+            Registrar máquina
+          </button>
         </div>
 
-        {mode === 'checkin' && <>
-        <details className="catalog-menu">
-          <summary>Registrar máquina nueva</summary>
+        {mode === 'catalog' && <>
           <section className="resume-section">
             <label>
               Máquina
@@ -415,8 +426,9 @@ export default function App() {
           <button className="secondary" onClick={registerMachine}>Registrar máquina</button>
           {catalogMessage && <p className="status-message">{catalogMessage}</p>}
           </section>
-        </details>
+        </>}
 
+        {mode === 'checkin' && <>
         <label>
           QR de máquina
           <input value={qrCode} onChange={(e) => setQrCode(e.target.value)} />
@@ -427,8 +439,6 @@ export default function App() {
         </button>
 
         {scannerOpen && <div id="qr-reader" className="qr-reader" />}
-
-        <button className="secondary" onClick={checkMachine}>Resolver QR</button>
 
         {machineInfo && (
           <div className="machine-box">
@@ -488,7 +498,9 @@ export default function App() {
                     checked={point.completado}
                     disabled={point.completado || (index > 0 && !checkinPoints[index - 1].completado)}
                     onChange={() => completeCheckinPoint(point, index)}
-                  /> {point.puntoBloqueo?.nombre} ({point.puntoBloqueo?.tipoEnergia || 'OTRA'})
+                  />
+                  <img className="energy-icon" src={energyImage(point.puntoBloqueo?.tipoEnergia)} alt="" />
+                  <span>{point.puntoBloqueo?.nombre} ({point.puntoBloqueo?.tipoEnergia || 'OTRA'})</span>
                 </li>
               ))}
             </ul>
@@ -509,7 +521,9 @@ export default function App() {
                     checked={point.completado}
                     disabled={point.completado || (index > 0 && !checkoutPoints[index - 1].completado)}
                     onChange={() => completeCheckoutPoint(point, index)}
-                  /> {point.puntoBloqueo?.nombre} ({point.puntoBloqueo?.tipoEnergia || 'OTRA'})
+                  />
+                  <img className="energy-icon" src={energyImage(point.puntoBloqueo?.tipoEnergia)} alt="" />
+                  <span>{point.puntoBloqueo?.nombre} ({point.puntoBloqueo?.tipoEnergia || 'OTRA'})</span>
                 </li>
               ))}
             </ul>

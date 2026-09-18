@@ -79,7 +79,7 @@ h1 {
 
 .mode-switch {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   padding: 4px;
   background: rgba(209, 222, 241, 0.72);
@@ -251,6 +251,18 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.energy-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  object-fit: contain;
+  filter: drop-shadow(2px 2px 3px rgba(86, 108, 148, 0.2));
+}
+
+.checklist li span {
+  min-width: 0;
 }
 
 .error {
