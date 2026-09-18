@@ -315,9 +315,12 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div>
-          <p className="eyebrow">Smart Factory</p>
-          <h1>Registro de LOTO</h1>
+        <div className="brand-lockup">
+          <img src="/zf-mark.svg" alt="ZF" className="zf-mark" />
+          <div>
+            <p className="eyebrow">Smart Factory ESL</p>
+            <h1>Registro de LOTO</h1>
+          </div>
         </div>
       </header>
 
@@ -374,23 +377,27 @@ export default function App() {
                 placeholder={`Punto de bloqueo ${index + 1}`}
               />
 
-              <select
-                value={point.tipoEnergia}
-                onChange={(e) => {
-                  const updated = [...catalogPoints];
-                  updated[index] = {
-                    ...updated[index],
-                    tipoEnergia: e.target.value
-                  };
-                  setCatalogPoints(updated);
-                }}
-              >
-                <option value="ELECTRICA">Eléctrica</option>
-                <option value="NEUMATICA">Neumática</option>
-                <option value="HIDRAULICA">Hidráulica</option>
-                <option value="MECANICA">Mecánica</option>
-                <option value="OTRA">Otra</option>
-              </select>
+              <div className="energy-picker">
+                <img className="energy-picker-icon" src={energyImage(point.tipoEnergia)} alt="" />
+                <select
+                  value={point.tipoEnergia}
+                  onChange={(e) => {
+                    const updated = [...catalogPoints];
+                    updated[index] = {
+                      ...updated[index],
+                      tipoEnergia: e.target.value
+                    };
+                    setCatalogPoints(updated);
+                  }}
+                >
+                  <option value="ELECTRICA">Eléctrica</option>
+                  <option value="NEUMATICA">Neumática</option>
+                  <option value="HIDRAULICA">Hidráulica</option>
+                  <option value="MECANICA">Mecánica</option>
+                  <option value="GRAVEDAD">Gravedad</option>
+                  <option value="OTRA">Otra</option>
+                </select>
+              </div>
 
               {catalogPoints.length > 1 && (
                 <button
