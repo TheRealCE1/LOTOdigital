@@ -61,8 +61,8 @@ input {
 }
 
 .zf-mark {
-  width: 48px;
-  height: 48px;
+  width: 80px;
+  height: 80px;
   object-fit: contain;
   filter: drop-shadow(0 6px 18px rgba(37, 99, 235, .28));
 }
