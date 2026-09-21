@@ -164,6 +164,39 @@ export default function App() {
       return;
     }
 
+    if (mode === 'checkout') {
+      try {
+        const res = await fetch(`${API_URL}/eventos/reanudar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ numeroEmpleado })
+        });
+        const data = await res.json();
+        const codigoBuscado = extractQrCode(qrCode);
+        const eventoActivo = (data.eventos || []).find(
+          (item) => item.maquina?.qrCode === codigoBuscado
+        );
+
+        if (!res.ok) {
+          setError(data?.error || 'No se pudo buscar la sesión de Check-out');
+          return;
+        }
+
+        if (!eventoActivo) {
+          setError('No hay una sesión LOTO abierta para ese empleado y ese QR');
+          return;
+        }
+
+        setResolvedMachine(eventoActivo.maquina);
+        loadEvent(eventoActivo);
+        setError('');
+        return;
+      } catch (err) {
+        setError('No se pudo consultar la sesión de Check-out');
+        return;
+      }
+    }
+
     try {
       const res = await fetch(`${API_URL}/eventos/checkin`, {
         method: 'POST',
@@ -550,18 +583,6 @@ export default function App() {
                   }}
                   placeholder="URL de la imagen"
                 />
-                <input
-                  value={image.etiqueta}
-                  onChange={(e) => {
-                    const updated = [...catalogImages];
-                    updated[index] = {
-                      ...updated[index],
-                      etiqueta: e.target.value
-                    };
-                    setCatalogImages(updated);
-                  }}
-                  placeholder="Etiqueta opcional"
-                />
                 {catalogImages.length > 1 && (
                   <button
                     type="button"
@@ -590,7 +611,7 @@ export default function App() {
           </section>
         )}
 
-        {mode === 'checkin' && !event && (
+        {(mode === 'checkin' || mode === 'checkout') && !event && (
           <>
             <label>
               QR de máquina
@@ -615,7 +636,7 @@ export default function App() {
               <input value={empleado} onChange={(e) => setEmpleado(e.target.value)} />
             </label>
 
-            <button className="primary" onClick={openEvent}>Abrir evento LOTO</button>
+            <button className="primary" onClick={openEvent}>{mode === 'checkout' ? 'Buscar evento de Check-out' : 'Abrir evento LOTO'}</button>
           </>
         )}
 
