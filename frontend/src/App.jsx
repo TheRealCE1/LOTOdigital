@@ -172,10 +172,7 @@ export default function App() {
           body: JSON.stringify({ numeroEmpleado })
         });
         const data = await res.json();
-        const codigoBuscado = extractQrCode(qrCode);
-        const eventoActivo = (data.eventos || []).find(
-          (item) => item.maquina?.qrCode === codigoBuscado
-        );
+        const eventoActivo = data.eventos?.[0];
 
         if (!res.ok) {
           setError(data?.error || 'No se pudo buscar la sesión de Check-out');
@@ -183,7 +180,7 @@ export default function App() {
         }
 
         if (!eventoActivo) {
-          setError('No hay una sesión LOTO abierta para ese empleado y ese QR');
+          setError('No hay una sesión LOTO abierta para ese empleado');
           return;
         }
 
@@ -613,18 +610,18 @@ export default function App() {
 
         {(mode === 'checkin' || mode === 'checkout') && !event && (
           <>
-            <label>
+            {mode === 'checkin' && <label>
               QR de máquina
               <input value={qrCode} onChange={(e) => setQrCode(e.target.value)} />
-            </label>
+            </label>}
 
-            <button className="secondary" onClick={() => setScannerOpen((open) => !open)}>
+            {mode === 'checkin' && <button className="secondary" onClick={() => setScannerOpen((open) => !open)}>
               {scannerOpen ? 'Cerrar cámara' : 'Escanear QR con cámara'}
-            </button>
+            </button>}
 
-            {scannerOpen && <div id="qr-reader" className="qr-reader" />}
+            {mode === 'checkin' && scannerOpen && <div id="qr-reader" className="qr-reader" />}
 
-            {machineInfo && (
+            {mode === 'checkin' && machineInfo && (
               <div className="machine-box">
                 <p><strong>Máquina:</strong> {machineInfo.nombre}</p>
                 <p><strong>Línea:</strong> {machineInfo.linea}</p>
@@ -636,7 +633,7 @@ export default function App() {
               <input value={empleado} onChange={(e) => setEmpleado(e.target.value)} />
             </label>
 
-            <button className="primary" onClick={openEvent}>{mode === 'checkout' ? 'Buscar evento de Check-out' : 'Abrir evento LOTO'}</button>
+            <button className="primary" onClick={openEvent}>{mode === 'checkout' ? 'Buscar evento LOTO' : 'Abrir evento LOTO'}</button>
           </>
         )}
 
