@@ -590,6 +590,35 @@ export default function App() {
           </section>
         )}
 
+        {mode === 'checkin' && !event && (
+          <>
+            <label>
+              QR de máquina
+              <input value={qrCode} onChange={(e) => setQrCode(e.target.value)} />
+            </label>
+
+            <button className="secondary" onClick={() => setScannerOpen((open) => !open)}>
+              {scannerOpen ? 'Cerrar cámara' : 'Escanear QR con cámara'}
+            </button>
+
+            {scannerOpen && <div id="qr-reader" className="qr-reader" />}
+
+            {machineInfo && (
+              <div className="machine-box">
+                <p><strong>Máquina:</strong> {machineInfo.nombre}</p>
+                <p><strong>Línea:</strong> {machineInfo.linea}</p>
+              </div>
+            )}
+
+            <label>
+              Número de empleado
+              <input value={empleado} onChange={(e) => setEmpleado(e.target.value)} />
+            </label>
+
+            <button className="primary" onClick={openEvent}>Abrir evento LOTO</button>
+          </>
+        )}
+
         {event && mode === 'checkin' && (
           <section className="checklist">
             <h2>Checklist de bloqueo</h2>
