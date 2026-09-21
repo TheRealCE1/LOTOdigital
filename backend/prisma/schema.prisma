@@ -14,26 +14,44 @@ model Linea {
 }
 
 model Maquina {
-  id             Int              @id @default(autoincrement())
-  nombre         String
-  qrCode         String           @unique
-  lineaId        Int
-  linea          Linea            @relation(fields: [lineaId], references: [id])
-  puntos         PuntoBloqueo[]
-  eventos        EventoLOTO[]
-  bloqueoActivo  BloqueoMaquina?
+  id            Int              @id @default(autoincrement())
+  nombre        String
+  qrCode        String           @unique
+  lineaId       Int
+  linea         Linea            @relation(fields: [lineaId], references: [id])
+  puntos        PuntoBloqueo[]
+  eventos       EventoLOTO[]
+  bloqueoActivo BloqueoMaquina?
+  imagenes      ImagenMaquina[]
 }
 
 model PuntoBloqueo {
   id            Int             @id @default(autoincrement())
   nombre        String
-  tipoEnergia   TipoEnergia    @default(OTRA)
+  tipoEnergia   TipoEnergia     @default(OTRA)
   orden         Int
   maquinaId     Int
   maquina       Maquina         @relation(fields: [maquinaId], references: [id])
-  eventoPuntos EventoPunto[]
+  eventoPuntos  EventoPunto[]
 
   @@unique([maquinaId, orden])
+}
+
+model ImagenMaquina {
+  id        Int     @id @default(autoincrement())
+  maquinaId Int
+  url       String
+  etiqueta  String?
+  orden     Int     @default(1)
+  maquina   Maquina @relation(fields: [maquinaId], references: [id])
+}
+
+model PasoGenerico {
+  id          Int                  @id @default(autoincrement())
+  orden       Int                  @unique
+  titulo      String
+  descripcion String
+  eventoPasos EventoPasoGenerico[]
 }
 
 model Operador {
@@ -43,22 +61,23 @@ model Operador {
 }
 
 model EventoLOTO {
-  id               Int          @id @default(autoincrement())
-  maquinaId        Int
-  operadorId       Int
-  estado           EstadoEvento @default(ABIERTO)
-  horaInicio       DateTime     @default(now())
-  horaFin          DateTime?
-  duracionMinutos  Int?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  id                 Int                  @id @default(autoincrement())
+  maquinaId          Int
+  operadorId         Int
+  estado             EstadoEvento         @default(ABIERTO)
+  horaInicio         DateTime             @default(now())
+  horaFin            DateTime?
+  duracionMinutos    Int?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
 
-  maquina          Maquina      @relation(fields: [maquinaId], references: [id])
-  operador         Operador     @relation(fields: [operadorId], references: [id])
-  puntos           EventoPunto[]
-  bloqueoActivo    BloqueoMaquina?
-  integracionEnviada Boolean     @default(false)
-  integracionError   String?
+  maquina             Maquina              @relation(fields: [maquinaId], references: [id])
+  operador            Operador             @relation(fields: [operadorId], references: [id])
+  puntos              EventoPunto[]
+  pasosGenericos      EventoPasoGenerico[]
+  bloqueoActivo       BloqueoMaquina?
+  integracionEnviada  Boolean              @default(false)
+  integracionError    String?
 }
 
 model BloqueoMaquina {
@@ -82,6 +101,19 @@ model EventoPunto {
   puntoBloqueo  PuntoBloqueo @relation(fields: [puntoBloqueoId], references: [id])
 
   @@unique([eventoId, puntoBloqueoId, tipo])
+}
+
+model EventoPasoGenerico {
+  id             Int             @id @default(autoincrement())
+  eventoId       Int
+  pasoGenericoId Int
+  tipo           TipoEventoPunto
+  completado     Boolean         @default(false)
+  realizadoAt    DateTime?
+  evento         EventoLOTO      @relation(fields: [eventoId], references: [id])
+  pasoGenerico   PasoGenerico    @relation(fields: [pasoGenericoId], references: [id])
+
+  @@unique([eventoId, pasoGenericoId, tipo])
 }
 
 enum EstadoEvento {

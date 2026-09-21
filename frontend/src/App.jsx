@@ -10,10 +10,13 @@ export default function App() {
   const [event, setEvent] = useState(null);
   const [checkinPoints, setCheckinPoints] = useState([]);
   const [checkoutPoints, setCheckoutPoints] = useState([]);
+  const [checkinSteps, setCheckinSteps] = useState([]);
+  const [checkoutSteps, setCheckoutSteps] = useState([]);
   const [recoveryEmployee, setRecoveryEmployee] = useState('');
   const [activeEvents, setActiveEvents] = useState([]);
   const [catalogMachine, setCatalogMachine] = useState({ nombre: '', linea: '', qrCode: '' });
   const [catalogPoints, setCatalogPoints] = useState([{ nombre: '', tipoEnergia: 'OTRA' }]);
+  const [catalogImages, setCatalogImages] = useState([{ url: '', etiqueta: 'Paso 5', orden: 1 }]);
   const [catalogMessage, setCatalogMessage] = useState('');
   const [mode, setMode] = useState('checkin');
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -35,8 +38,23 @@ export default function App() {
       qrCode: data.qrCode,
       nombre: data.nombre,
       linea: data.linea?.nombre || 'Sin línea',
-      puntos: data.puntos || []
+      puntos: data.puntos || [],
+      imagenes: data.imagenes || []
     });
+  }
+
+  function normalizeGenericSteps(items = [], tipo) {
+    return [...(items || [])]
+      .filter((item) => item.tipo === tipo)
+      .sort((a, b) => {
+        const pasoA = a.pasoGenerico?.orden ?? a.orden ?? 0;
+        const pasoB = b.pasoGenerico?.orden ?? b.orden ?? 0;
+        return pasoA - pasoB;
+      })
+      .map((item) => ({
+        ...item,
+        pasoGenerico: item.pasoGenerico || {}
+      }));
   }
 
   function energyImage(type) {
@@ -113,7 +131,14 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...catalogMachine,
-          puntos: catalogPoints.filter((point) => point.nombre.trim())
+          puntos: catalogPoints.filter((point) => point.nombre.trim()),
+          imagenes: catalogImages
+            .filter((image) => image.url?.trim())
+            .map((image, index) => ({
+              ...image,
+              orden: Number(image.orden || index + 1),
+              etiqueta: image.etiqueta?.trim() || `Imagen ${index + 1}`
+            }))
         })
       });
       const data = await res.json();
@@ -169,11 +194,13 @@ export default function App() {
     setEvent(savedEvent);
     setCheckinPoints(savedEvent.puntos?.filter((point) => point.tipo === 'CHECKIN') || []);
     setCheckoutPoints([...(savedEvent.puntos?.filter((point) => point.tipo === 'CHECKIN') || [])].reverse().map((point) => ({
-        ...point,
-        completado: Boolean(savedEvent.puntos.find(
-          (savedPoint) => savedPoint.puntoBloqueoId === point.puntoBloqueoId && savedPoint.tipo === 'CHECKOUT'
-        )?.completado)
-      })));
+      ...point,
+      completado: Boolean(savedEvent.puntos.find(
+        (savedPoint) => savedPoint.puntoBloqueoId === point.puntoBloqueoId && savedPoint.tipo === 'CHECKOUT'
+      )?.completado)
+    })));
+    setCheckinSteps(normalizeGenericSteps(savedEvent.pasosGenericos, 'CHECKIN'));
+    setCheckoutSteps(normalizeGenericSteps(savedEvent.pasosGenericos, 'CHECKOUT').reverse());
   }
 
   async function resumeEvents() {
@@ -225,6 +252,8 @@ export default function App() {
           setEvent(null);
           setCheckinPoints([]);
           setCheckoutPoints([]);
+          setCheckinSteps([]);
+          setCheckoutSteps([]);
           setMode('checkout');
           setError('Esta sesión ya fue cerrada. Busca otra sesión activa.');
           return;
@@ -267,6 +296,8 @@ export default function App() {
           setEvent(null);
           setCheckinPoints([]);
           setCheckoutPoints([]);
+          setCheckinSteps([]);
+          setCheckoutSteps([]);
           setMode('checkout');
           setError('Esta sesión ya fue cerrada. Busca otra sesión activa.');
           return;
@@ -283,6 +314,84 @@ export default function App() {
       setError('');
     } catch (err) {
       setError('No se pudo guardar el punto');
+    }
+  }
+
+  async function completeCheckinStep(step) {
+    if (!event || !step?.pasoGenericoId) return;
+
+    try {
+      const res = await fetch(`${API_URL}/eventos/${event.id}/checkpoint`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pasoGenericoId: step.pasoGenericoId,
+          tipo: 'CHECKIN',
+          completado: true
+        })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 409 && data?.error === 'El evento ya está cerrado') {
+          setEvent(null);
+          setCheckinPoints([]);
+          setCheckoutPoints([]);
+          setCheckinSteps([]);
+          setCheckoutSteps([]);
+          setMode('checkout');
+          setError('Esta sesión ya fue cerrada. Busca otra sesión activa.');
+          return;
+        }
+        setError(data?.error || 'No se pudo completar el paso');
+        return;
+      }
+
+      setCheckinSteps((current) => current.map((item) =>
+        item.pasoGenericoId === step.pasoGenericoId ? { ...item, completado: true } : item
+      ));
+      setError('');
+    } catch (err) {
+      setError('No se pudo guardar el paso');
+    }
+  }
+
+  async function completeCheckoutStep(step) {
+    if (!event || !step?.pasoGenericoId) return;
+
+    try {
+      const res = await fetch(`${API_URL}/eventos/${event.id}/checkpoint`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pasoGenericoId: step.pasoGenericoId,
+          tipo: 'CHECKOUT',
+          completado: true
+        })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 409 && data?.error === 'El evento ya está cerrado') {
+          setEvent(null);
+          setCheckinPoints([]);
+          setCheckoutPoints([]);
+          setCheckinSteps([]);
+          setCheckoutSteps([]);
+          setMode('checkout');
+          setError('Esta sesión ya fue cerrada. Busca otra sesión activa.');
+          return;
+        }
+        setError(data?.error || 'No se pudo registrar la reversión del paso');
+        return;
+      }
+
+      setCheckoutSteps((current) => current.map((item) =>
+        item.pasoGenericoId === step.pasoGenericoId ? { ...item, completado: true } : item
+      ));
+      setError('');
+    } catch (err) {
+      setError('No se pudo guardar la reversión del paso');
     }
   }
 
@@ -346,7 +455,7 @@ export default function App() {
           </button>
         </div>
 
-        {mode === 'catalog' && <>
+        {mode === 'catalog' && (
           <section className="resume-section">
             <label>
               Máquina
@@ -360,146 +469,162 @@ export default function App() {
               QR
               <input value={catalogMachine.qrCode} onChange={(e) => setCatalogMachine({ ...catalogMachine, qrCode: e.target.value })} placeholder="Ej. A8-M01" />
             </label>
+
             <label>Puntos de bloqueo</label>
-
-          {catalogPoints.map((point, index) => (
-            <div key={index} className="lock-point-row">
-              <input
-                value={point.nombre}
-                onChange={(e) => {
-                  const updated = [...catalogPoints];
-                  updated[index] = {
-                    ...updated[index],
-                    nombre: e.target.value
-                  };
-                  setCatalogPoints(updated);
-                }}
-                placeholder={`Punto de bloqueo ${index + 1}`}
-              />
-
-              <div className="energy-picker">
-                <img className="energy-picker-icon" src={energyImage(point.tipoEnergia)} alt="" />
-                <select
-                  value={point.tipoEnergia}
+            {catalogPoints.map((point, index) => (
+              <div key={index} className="lock-point-row">
+                <input
+                  value={point.nombre}
                   onChange={(e) => {
                     const updated = [...catalogPoints];
                     updated[index] = {
                       ...updated[index],
-                      tipoEnergia: e.target.value
+                      nombre: e.target.value
                     };
                     setCatalogPoints(updated);
                   }}
-                >
-                  <option value="ELECTRICA">Eléctrica</option>
-                  <option value="NEUMATICA">Neumática</option>
-                  <option value="HIDRAULICA">Hidráulica</option>
-                  <option value="MECANICA">Mecánica</option>
-                  <option value="GRAVEDAD">Gravedad</option>
-                  <option value="OTRA">Otra</option>
-                </select>
-              </div>
+                  placeholder={`Punto de bloqueo ${index + 1}`}
+                />
 
-              {catalogPoints.length > 1 && (
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => {
-                    setCatalogPoints(
-                      catalogPoints.filter((_, i) => i !== index)
-                    );
-                  }}
-                >
-                  Eliminar
-                </button>
-              )}
-            </div>
-          ))}
+                <div className="energy-picker">
+                  <img className="energy-picker-icon" src={energyImage(point.tipoEnergia)} alt="" />
+                  <select
+                    value={point.tipoEnergia}
+                    onChange={(e) => {
+                      const updated = [...catalogPoints];
+                      updated[index] = {
+                        ...updated[index],
+                        tipoEnergia: e.target.value
+                      };
+                      setCatalogPoints(updated);
+                    }}
+                  >
+                    <option value="ELECTRICA">Eléctrica</option>
+                    <option value="NEUMATICA">Neumática</option>
+                    <option value="HIDRAULICA">Hidráulica</option>
+                    <option value="MECANICA">Mecánica</option>
+                    <option value="GRAVEDAD">Gravedad</option>
+                    <option value="OTRA">Otra</option>
+                  </select>
+                </div>
 
-          <button
-            type="button"
-            className="secondary"
-            onClick={() =>
-              setCatalogPoints([
-                ...catalogPoints,
-                {
-                  nombre: '',
-                  tipoEnergia: 'OTRA'
-                }
-              ])
-            }
-          >
-            + Agregar punto de bloqueo
-          </button>
-          <button className="secondary" onClick={registerMachine}>Registrar máquina</button>
-          {catalogMessage && <p className="status-message">{catalogMessage}</p>}
-          </section>
-        </>}
-
-        {mode === 'checkin' && <>
-        <label>
-          QR de máquina
-          <input value={qrCode} onChange={(e) => setQrCode(e.target.value)} />
-        </label>
-
-        <button className="secondary" onClick={() => setScannerOpen((open) => !open)}>
-          {scannerOpen ? 'Cerrar cámara' : 'Escanear QR con cámara'}
-        </button>
-
-        {scannerOpen && <div id="qr-reader" className="qr-reader" />}
-
-        {machineInfo && (
-          <div className="machine-box">
-            <p><strong>Máquina:</strong> {machineInfo.nombre}</p>
-            <p><strong>Línea:</strong> {machineInfo.linea}</p>
-          </div>
-        )}
-
-        <label>
-          Número de empleado
-          <input value={empleado} onChange={(e) => setEmpleado(e.target.value)} />
-        </label>
-
-        <button className="primary" onClick={openEvent}>Abrir evento LOTO</button>
-        </>}
-
-        {mode === 'checkout' && <section className="resume-section">
-          <h2>Continuar sesión guardada</h2>
-          <label>
-            Número de empleado
-            <input
-              value={recoveryEmployee}
-              onChange={(e) => setRecoveryEmployee(e.target.value)}
-              placeholder="Ej. 48213"
-            />
-          </label>
-          <button className="secondary" onClick={resumeEvents}>Buscar mis bloqueos activos</button>
-          {activeEvents.length > 0 && (
-            <ul className="session-list">
-              {activeEvents.map((savedEvent) => (
-                <li key={savedEvent.id}>
-                  <span>
-                    {savedEvent.maquina.nombre} · {savedEvent.maquina.linea.nombre}
-                  </span>
-                  <button className="secondary" onClick={() => {
-                    loadEvent(savedEvent);
-                    setMode('checkout');
-                    setResolvedMachine(savedEvent.maquina);
-                    setError('');
-                  }}>
-                    Continuar
+                {catalogPoints.length > 1 && (
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => {
+                      setCatalogPoints(catalogPoints.filter((_, i) => i !== index));
+                    }}
+                  >
+                    Eliminar
                   </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>}
+                )}
+              </div>
+            ))}
+
+            <button
+              type="button"
+              className="secondary"
+              onClick={() =>
+                setCatalogPoints([
+                  ...catalogPoints,
+                  { nombre: '', tipoEnergia: 'OTRA' }
+                ])
+              }
+            >
+              + Agregar punto de bloqueo
+            </button>
+
+            <label>Imágenes del paso 5</label>
+            {catalogImages.map((image, index) => (
+              <div key={index} className="catalog-image-row">
+                <input
+                  value={image.url}
+                  onChange={(e) => {
+                    const updated = [...catalogImages];
+                    updated[index] = {
+                      ...updated[index],
+                      url: e.target.value
+                    };
+                    setCatalogImages(updated);
+                  }}
+                  placeholder="URL de la imagen"
+                />
+                <input
+                  value={image.etiqueta}
+                  onChange={(e) => {
+                    const updated = [...catalogImages];
+                    updated[index] = {
+                      ...updated[index],
+                      etiqueta: e.target.value
+                    };
+                    setCatalogImages(updated);
+                  }}
+                  placeholder="Etiqueta opcional"
+                />
+                {catalogImages.length > 1 && (
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => setCatalogImages(catalogImages.filter((_, i) => i !== index))}
+                  >
+                    Quitar
+                  </button>
+                )}
+              </div>
+            ))}
+
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => setCatalogImages([
+                ...catalogImages,
+                { url: '', etiqueta: `Imagen ${catalogImages.length + 1}`, orden: catalogImages.length + 1 }
+              ])}
+            >
+              + Agregar imagen del paso 5
+            </button>
+
+            <button className="secondary" onClick={registerMachine}>Registrar máquina</button>
+            {catalogMessage && <p className="status-message">{catalogMessage}</p>}
+          </section>
+        )}
 
         {event && mode === 'checkin' && (
           <section className="checklist">
             <h2>Checklist de bloqueo</h2>
-            <ul>
+
+            <ul className="step-list">
+              {checkinSteps.map((step, index) => (
+                <li key={`checkin-step-${step.pasoGenericoId || index}`} className="step-row">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(step.completado)}
+                    disabled={step.completado || (index > 0 && !checkinSteps[index - 1].completado)}
+                    onChange={() => completeCheckinStep(step)}
+                  />
+                  <div className="step-text">
+                    <strong>{step.pasoGenerico?.titulo || `Paso ${index + 1}`}</strong>
+                    <p>{step.pasoGenerico?.descripcion}</p>
+                    {step.pasoGenerico?.orden === 5 && machineInfo?.imagenes?.length > 0 && (
+                      <div className="step-images">
+                        {machineInfo.imagenes.map((image, imageIndex) => (
+                          <figure key={`${step.pasoGenericoId}-${imageIndex}`}>
+                            <img src={image.url} alt={image.etiqueta || `Imagen ${imageIndex + 1}`} />
+                            {image.etiqueta && <figcaption>{image.etiqueta}</figcaption>}
+                          </figure>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            <div className="step-section-title">Paso 6: Bloquee las fuentes de energía</div>
+            <ul className="step-list">
               {checkinPoints.map((point, index) => (
-                <li key={point.puntoBloqueoId}>
+                <li key={point.puntoBloqueoId} className="point-row">
                   <input
                     type="checkbox"
                     checked={point.completado}
@@ -511,6 +636,7 @@ export default function App() {
                 </li>
               ))}
             </ul>
+
             <button className="secondary" onClick={() => setMode('checkout')}>
               Ir a Check-out cuando termine el trabajo
             </button>
@@ -520,9 +646,11 @@ export default function App() {
         {event && mode === 'checkout' && (
           <section className="checklist">
             <h2>Checklist de desbloqueo</h2>
-            <ul>
+
+            <div className="step-section-title">Paso 6: Bloquee las fuentes de energía</div>
+            <ul className="step-list">
               {checkoutPoints.map((point, index) => (
-                <li key={`checkout-${point.puntoBloqueoId}`}>
+                <li key={`checkout-${point.puntoBloqueoId}`} className="point-row">
                   <input
                     type="checkbox"
                     checked={point.completado}
@@ -534,7 +662,24 @@ export default function App() {
                 </li>
               ))}
             </ul>
-            <button className="danger" disabled={!checkoutPoints.every((point) => point.completado)} onClick={closeEvent}>
+
+            <ul className="step-list">
+              {checkoutSteps.map((step, index) => (
+                <li key={`checkout-step-${step.pasoGenericoId || index}`} className="step-row">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(step.completado)}
+                    disabled={step.completado || (index > 0 && !checkoutSteps[index - 1].completado)}
+                    onChange={() => completeCheckoutStep(step)}
+                  />
+                  <div className="step-text">
+                    <strong>{step.pasoGenerico?.titulo || `Paso ${index + 1}`}</strong>
+                    <p>{step.pasoGenerico?.descripcion}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <button className="danger" disabled={!checkoutPoints.every((point) => point.completado) || !checkoutSteps.every((step) => step.completado)} onClick={closeEvent}>
               Cerrar LOTO
             </button>
           </section>

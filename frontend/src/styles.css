@@ -319,3 +319,86 @@ select option {
   color: #a2253a;
   font-weight: 600;
 }
+
+.step-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.step-section-title {
+  margin: 8px 0 2px;
+  font-size: 0.95rem;
+  color: var(--blue-deep);
+}
+
+.step-row,
+.point-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.step-text strong {
+  color: var(--txt1);
+}
+
+.step-text p {
+  margin: 0;
+  color: var(--txt2);
+}
+
+.step-warning {
+  color: #f5c542;
+  font-size: 0.85rem;
+}
+
+.step-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.step-images figure {
+  margin: 0;
+  width: 120px;
+}
+
+.step-images img {
+  width: 100%;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+
+.step-images figcaption {
+  font-size: 0.72rem;
+  color: var(--txt3);
+  text-align: center;
+  margin-top: 4px;
+}
+
+.hint-text {
+  margin: -4px 0 4px;
+  font-size: 0.82rem;
+  color: var(--txt3);
+}
+
+.catalog-image-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}

@@ -67,7 +67,7 @@ app.get('/api/lineas', async (req, res) => {
 });
 
 app.post('/api/catalogo/maquinas', async (req, res) => {
-  const { nombre, linea, qrCode, puntos = [] } = req.body;
+  const { nombre, linea, qrCode, puntos = [], imagenes = [] } = req.body;
 
   if (!nombre || !linea || !qrCode) {
     return res.status(400).json({
@@ -78,6 +78,16 @@ app.post('/api/catalogo/maquinas', async (req, res) => {
   const puntosValidos = Array.isArray(puntos) && puntos.length > 0
     ? puntos
     : [{ nombre: 'Bloqueo general', tipoEnergia: 'OTRA' }];
+
+  const imagenesValidas = Array.isArray(imagenes)
+    ? imagenes
+        .map((imagen, index) => ({
+          url: String(imagen?.url || '').trim(),
+          etiqueta: String(imagen?.etiqueta || '').trim() || `Imagen ${index + 1}`,
+          orden: Number(imagen?.orden || index + 1)
+        }))
+        .filter((imagen) => imagen.url)
+    : [];
 
   try {
     const maquina = await prisma.$transaction(async (tx) => {
@@ -118,9 +128,26 @@ app.post('/api/catalogo/maquinas', async (req, res) => {
         });
       }
 
+      await tx.imagenMaquina.deleteMany({ where: { maquinaId: maquinaRegistro.id } });
+
+      for (const imagen of imagenesValidas) {
+        await tx.imagenMaquina.create({
+          data: {
+            maquinaId: maquinaRegistro.id,
+            url: imagen.url,
+            etiqueta: imagen.etiqueta,
+            orden: imagen.orden
+          }
+        });
+      }
+
       return tx.maquina.findUnique({
         where: { id: maquinaRegistro.id },
-        include: { linea: true, puntos: { orderBy: { orden: 'asc' } } }
+        include: {
+          linea: true,
+          puntos: { orderBy: { orden: 'asc' } },
+          imagenes: { orderBy: { orden: 'asc' } }
+        }
       });
     });
 
@@ -137,7 +164,11 @@ app.post('/api/catalogo/maquinas', async (req, res) => {
 app.get('/api/maquinas/:qrCode', async (req, res) => {
   const maquina = await prisma.maquina.findUnique({
     where: { qrCode: req.params.qrCode },
-    include: { linea: true, puntos: { orderBy: { orden: 'asc' } } }
+    include: {
+      linea: true,
+      puntos: { orderBy: { orden: 'asc' } },
+      imagenes: { orderBy: { orden: 'asc' } }
+    }
   });
 
   if (!maquina) {
@@ -171,11 +202,15 @@ app.post('/api/eventos/reanudar', async (req, res) => {
   const eventos = await prisma.eventoLOTO.findMany({
     where: { estado: 'ABIERTO' },
     include: {
-      maquina: { include: { linea: true } },
+      maquina: { include: { linea: true, imagenes: { orderBy: { orden: 'asc' } } } },
       operador: true,
       puntos: {
         include: { puntoBloqueo: true },
         orderBy: { orden: 'asc' }
+      },
+      pasosGenericos: {
+        include: { pasoGenerico: true },
+        orderBy: { id: 'asc' }
       }
     },
     orderBy: { horaInicio: 'desc' }
@@ -198,7 +233,11 @@ app.post('/api/eventos/checkin', async (req, res) => {
 
   const maquina = await prisma.maquina.findUnique({
     where: { qrCode },
-    include: { linea: true, puntos: { orderBy: { orden: 'asc' } } }
+    include: {
+      linea: true,
+      puntos: { orderBy: { orden: 'asc' } },
+      imagenes: { orderBy: { orden: 'asc' } }
+    }
   });
 
   if (!maquina) {
@@ -227,11 +266,15 @@ app.post('/api/eventos/checkin', async (req, res) => {
       const eventoActivo = await prisma.eventoLOTO.findUnique({
         where: { id: eventoAbierto.id },
         include: {
-          maquina: { include: { linea: true } },
+          maquina: { include: { linea: true, imagenes: { orderBy: { orden: 'asc' } } } },
           operador: true,
           puntos: {
             include: { puntoBloqueo: true },
             orderBy: { orden: 'asc' }
+          },
+          pasosGenericos: {
+            include: { pasoGenerico: true },
+            orderBy: { id: 'asc' }
           }
         }
       });
@@ -256,6 +299,10 @@ app.post('/api/eventos/checkin', async (req, res) => {
 
   try {
     evento = await prisma.$transaction(async (tx) => {
+      const pasosGenericos = await tx.pasoGenerico.findMany({
+        orderBy: { orden: 'asc' }
+      });
+
       const nuevoEvento = await tx.eventoLOTO.create({
         data: {
           maquinaId: maquina.id,
@@ -269,6 +316,20 @@ app.post('/api/eventos/checkin', async (req, res) => {
               orden: punto.orden,
               completado: false
             }))
+          },
+          pasosGenericos: {
+            create: pasosGenericos.flatMap((paso) => [
+              {
+                pasoGenericoId: paso.id,
+                tipo: 'CHECKIN',
+                completado: false
+              },
+              {
+                pasoGenericoId: paso.id,
+                tipo: 'CHECKOUT',
+                completado: false
+              }
+            ])
           }
         }
       });
@@ -280,9 +341,10 @@ app.post('/api/eventos/checkin', async (req, res) => {
       return tx.eventoLOTO.findUnique({
         where: { id: nuevoEvento.id },
         include: {
-          maquina: { include: { linea: true } },
+          maquina: { include: { linea: true, imagenes: { orderBy: { orden: 'asc' } } } },
           operador: true,
-          puntos: { include: { puntoBloqueo: true } }
+          puntos: { include: { puntoBloqueo: true } },
+          pasosGenericos: { include: { pasoGenerico: true } }
         }
       });
     });
@@ -303,10 +365,17 @@ app.post('/api/eventos/checkin', async (req, res) => {
 });
 
 app.post('/api/eventos/:id/checkpoint', async (req, res) => {
-  const { puntoBloqueoId, tipo = 'CHECKIN', completado = true } = req.body;
+  const {
+    puntoBloqueoId,
+    pasoGenericoId,
+    tipo = 'CHECKIN',
+    completado = true
+  } = req.body;
 
-  if (!puntoBloqueoId) {
-    return res.status(400).json({ error: 'puntoBloqueoId es obligatorio' });
+  if (!puntoBloqueoId && !pasoGenericoId) {
+    return res.status(400).json({
+      error: 'puntoBloqueoId o pasoGenericoId es obligatorio'
+    });
   }
 
   if (!['CHECKIN', 'CHECKOUT'].includes(tipo)) {
@@ -316,8 +385,17 @@ app.post('/api/eventos/:id/checkpoint', async (req, res) => {
   const evento = await prisma.eventoLOTO.findUnique({
     where: { id: Number(req.params.id) },
     include: {
-      maquina: { include: { puntos: { orderBy: { orden: 'asc' } } } },
-      puntos: true
+      maquina: {
+        include: {
+          puntos: { orderBy: { orden: 'asc' } },
+          imagenes: { orderBy: { orden: 'asc' } }
+        }
+      },
+      puntos: true,
+      pasosGenericos: {
+        include: { pasoGenerico: true },
+        orderBy: { id: 'asc' }
+      }
     }
   });
 
@@ -325,41 +403,98 @@ app.post('/api/eventos/:id/checkpoint', async (req, res) => {
     return res.status(404).json({ error: 'Evento no encontrado' });
   }
 
-  const punto = evento.maquina.puntos.find((item) => item.id === Number(puntoBloqueoId));
-
-  if (!punto) {
-    return res.status(400).json({ error: 'El punto no pertenece a la máquina del evento' });
-  }
-
-  if (completado) {
-    const puntosOrdenados = tipo === 'CHECKIN'
-      ? evento.maquina.puntos
-      : [...evento.maquina.puntos].reverse();
-    const indiceActual = puntosOrdenados.findIndex((item) => item.id === punto.id);
-    const anterior = puntosOrdenados[indiceActual - 1];
-    const tipoAnterior = tipo;
-    const anteriorEvento = anterior && evento.puntos.find(
-      (item) => item.puntoBloqueoId === anterior.id && item.tipo === tipoAnterior
-    );
-
-    if (anterior && !anteriorEvento?.completado) {
-      return res.status(409).json({
-        error: tipo === 'CHECKIN'
-          ? 'Debes completar primero el punto anterior'
-          : 'Debes retirar primero el bloqueo anterior en orden inverso'
-      });
-    }
-  }
-
   if (evento.estado === 'CERRADO') {
     return res.status(409).json({ error: 'El evento ya está cerrado' });
   }
 
-  const eventoPunto = await prisma.eventoPunto.upsert({
-    where: {
-      eventoId_puntoBloqueoId_tipo: {
+  if (puntoBloqueoId) {
+    const punto = evento.maquina.puntos.find((item) => item.id === Number(puntoBloqueoId));
+
+    if (!punto) {
+      return res.status(400).json({ error: 'El punto no pertenece a la máquina del evento' });
+    }
+
+    if (completado) {
+      const puntosOrdenados = tipo === 'CHECKIN'
+        ? evento.maquina.puntos
+        : [...evento.maquina.puntos].reverse();
+      const indiceActual = puntosOrdenados.findIndex((item) => item.id === punto.id);
+      const anterior = puntosOrdenados[indiceActual - 1];
+      const anteriorEvento = anterior && evento.puntos.find(
+        (item) => item.puntoBloqueoId === anterior.id && item.tipo === tipo
+      );
+
+      if (anterior && !anteriorEvento?.completado) {
+        return res.status(409).json({
+          error: tipo === 'CHECKIN'
+            ? 'Debes completar primero el punto anterior'
+            : 'Debes retirar primero el bloqueo anterior en orden inverso'
+        });
+      }
+    }
+
+    const eventoPunto = await prisma.eventoPunto.upsert({
+      where: {
+        eventoId_puntoBloqueoId_tipo: {
+          eventoId: Number(req.params.id),
+          puntoBloqueoId: Number(puntoBloqueoId),
+          tipo
+        }
+      },
+      update: {
+        completado,
+        realizadoAt: completado ? new Date() : null
+      },
+      create: {
         eventoId: Number(req.params.id),
         puntoBloqueoId: Number(puntoBloqueoId),
+        tipo,
+        orden: tipo === 'CHECKIN'
+          ? punto.orden
+          : evento.maquina.puntos.length - punto.orden + 1,
+        completado,
+        realizadoAt: completado ? new Date() : null
+      }
+    });
+
+    return res.json({ message: 'Punto actualizado', punto: eventoPunto });
+  }
+
+  const paso = evento.pasosGenericos.find((item) => item.pasoGenericoId === Number(pasoGenericoId));
+
+  if (!paso) {
+    return res.status(400).json({ error: 'El paso no pertenece al checklist del evento' });
+  }
+
+  const pasoOrdenado = [...evento.pasosGenericos]
+    .filter((item) => item.tipo === tipo)
+    .sort((a, b) => (tipo === 'CHECKOUT'
+      ? b.pasoGenerico.orden - a.pasoGenerico.orden
+      : a.pasoGenerico.orden - b.pasoGenerico.orden));
+
+  if (completado) {
+    const indiceActual = pasoOrdenado.findIndex((item) => item.pasoGenericoId === Number(pasoGenericoId));
+    const anterior = pasoOrdenado[indiceActual - 1];
+    const anteriorCompletado = anterior
+      ? evento.pasosGenericos.find(
+        (item) => item.pasoGenericoId === anterior.pasoGenericoId && item.tipo === tipo
+      )?.completado
+      : true;
+
+    if (anterior && !anteriorCompletado) {
+      return res.status(409).json({
+        error: tipo === 'CHECKIN'
+          ? 'Debes completar primero el paso anterior'
+          : 'Debes revertir primero el paso anterior en orden inverso'
+      });
+    }
+  }
+
+  const eventoPaso = await prisma.eventoPasoGenerico.upsert({
+    where: {
+      eventoId_pasoGenericoId_tipo: {
+        eventoId: Number(req.params.id),
+        pasoGenericoId: Number(pasoGenericoId),
         tipo
       }
     },
@@ -369,26 +504,33 @@ app.post('/api/eventos/:id/checkpoint', async (req, res) => {
     },
     create: {
       eventoId: Number(req.params.id),
-      puntoBloqueoId: Number(puntoBloqueoId),
+      pasoGenericoId: Number(pasoGenericoId),
       tipo,
-      orden: tipo === 'CHECKIN'
-        ? punto.orden
-        : evento.maquina.puntos.length - punto.orden + 1,
       completado,
       realizadoAt: completado ? new Date() : null
     }
   });
 
-  res.json({ message: 'Punto actualizado', punto: eventoPunto });
+  return res.json({ message: 'Paso actualizado', paso: eventoPaso });
 });
 
 app.post('/api/eventos/:id/checkout', async (req, res) => {
   const evento = await prisma.eventoLOTO.findUnique({
     where: { id: Number(req.params.id) },
     include: {
-      maquina: { include: { linea: true, puntos: { orderBy: { orden: 'asc' } } } },
+      maquina: {
+        include: {
+          linea: true,
+          puntos: { orderBy: { orden: 'asc' } },
+          imagenes: { orderBy: { orden: 'asc' } }
+        }
+      },
       operador: true,
-      puntos: true
+      puntos: true,
+      pasosGenericos: {
+        include: { pasoGenerico: true },
+        orderBy: { id: 'asc' }
+      }
     }
   });
 
@@ -400,26 +542,36 @@ app.post('/api/eventos/:id/checkout', async (req, res) => {
     return res.status(409).json({ error: 'El evento ya está cerrado' });
   }
 
-  const checkinCompleto = evento.maquina.puntos.every((punto) =>
-    evento.puntos.some(
-      (eventoPunto) => eventoPunto.puntoBloqueoId === punto.id &&
-        eventoPunto.tipo === 'CHECKIN' &&
-        eventoPunto.completado
-    )
-  );
+  const pasosCheckin = [...evento.pasosGenericos]
+    .filter((item) => item.tipo === 'CHECKIN')
+    .sort((a, b) => a.pasoGenerico.orden - b.pasoGenerico.orden);
+
+  const checkinCompleto = pasosCheckin.every((item) => item.completado) &&
+    evento.maquina.puntos.every((punto) =>
+      evento.puntos.some(
+        (eventoPunto) => eventoPunto.puntoBloqueoId === punto.id &&
+          eventoPunto.tipo === 'CHECKIN' &&
+          eventoPunto.completado
+      )
+    );
 
   if (!checkinCompleto) {
     return res.status(409).json({ error: 'No puedes cerrar el evento con el checklist de bloqueo incompleto' });
   }
 
+  const pasosCheckout = [...evento.pasosGenericos]
+    .filter((item) => item.tipo === 'CHECKOUT')
+    .sort((a, b) => b.pasoGenerico.orden - a.pasoGenerico.orden);
+
   const puntosInversos = [...evento.maquina.puntos].reverse();
-  const checkoutCompleto = puntosInversos.every((punto) =>
-    evento.puntos.some(
-      (eventoPunto) => eventoPunto.puntoBloqueoId === punto.id &&
-        eventoPunto.tipo === 'CHECKOUT' &&
-        eventoPunto.completado
-    )
-  );
+  const checkoutCompleto = pasosCheckout.every((item) => item.completado) &&
+    puntosInversos.every((punto) =>
+      evento.puntos.some(
+        (eventoPunto) => eventoPunto.puntoBloqueoId === punto.id &&
+          eventoPunto.tipo === 'CHECKOUT' &&
+          eventoPunto.completado
+      )
+    );
 
   if (!checkoutCompleto) {
     return res.status(409).json({
