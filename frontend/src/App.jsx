@@ -49,7 +49,7 @@ export default function App() {
     dispositivoBloqueo: '',
     validacion: ''
   }]);
-  const [catalogImages, setCatalogImages] = useState([{ url: '', etiqueta: 'Paso 5', orden: 1 }]);
+  const [catalogImages, setCatalogImages] = useState([{ url: '', etiqueta: '', ubicacionReferencia: '', orden: 1 }]);
   const [catalogMessage, setCatalogMessage] = useState('');
   const [editingMachineId, setEditingMachineId] = useState(null);
   const [machines, setMachines] = useState([]);
@@ -136,6 +136,29 @@ export default function App() {
     setCatalogPoints((current) => current.map((point, pointIndex) =>
       pointIndex === index ? { ...point, [field]: value } : point
     ));
+  }
+
+  function addEmergencyStop() {
+    if (catalogPoints.some((point) => point.identificador === 'PE1')) {
+      setCatalogMessage('El punto de paro de emergencia ya está agregado');
+      return;
+    }
+
+    setCatalogPoints((current) => [...current, {
+      identificador: 'PE1',
+      nombre: 'Paro de emergencia',
+      tipoEnergia: 'MECANICA',
+      ubicacion: 'Tablero de control',
+      metodoAccion: 'Presionar y bloquear el paro de emergencia',
+      dispositivoBloqueo: 'Candado para paro de emergencia',
+      validacion: 'Botón de paro activado'
+    }]);
+    setCatalogImages((current) => [...current, {
+      url: '/emergency-stop.svg',
+      etiqueta: 'Paro de emergencia',
+      ubicacionReferencia: 'Tablero de control',
+      orden: current.length + 1
+    }]);
   }
 
   function catalogHeaders(includeContentType = false) {
@@ -349,9 +372,10 @@ export default function App() {
       ? machine.imagenes.map((image, index) => ({
         url: image.url,
         etiqueta: image.etiqueta || `Imagen ${index + 1}`,
+        ubicacionReferencia: image.ubicacionReferencia || '',
         orden: image.orden || index + 1
       }))
-      : [{ url: '', etiqueta: 'Paso 5', orden: 1 }]);
+      : [{ url: '', etiqueta: '', ubicacionReferencia: '', orden: 1 }]);
     setCatalogMessage(`Editando ${machine.nombre}`);
     setMode('catalog');
   }
@@ -831,7 +855,7 @@ export default function App() {
 
         {adminUnlocked && ['catalog', 'machines', 'active-events', 'history'].includes(mode) && (
           <div className="admin-navigation">
-            <button type="button" className={mode === 'catalog' ? 'secondary active-admin' : 'secondary'} onClick={() => { setEditingMachineId(null); setCatalogMachine({ nombre: '', linea: '', qrCode: '' }); setCatalogPoints([{ identificador: '', nombre: '', tipoEnergia: 'OTRA', ubicacion: '', metodoAccion: '', dispositivoBloqueo: '', validacion: '' }]); setCatalogImages([{ url: '', etiqueta: 'Paso 5', orden: 1 }]); setCatalogMessage(''); setMode('catalog'); }}>Registrar máquina</button>
+            <button type="button" className={mode === 'catalog' ? 'secondary active-admin' : 'secondary'} onClick={() => { setEditingMachineId(null); setCatalogMachine({ nombre: '', linea: '', qrCode: '' }); setCatalogPoints([{ identificador: '', nombre: '', tipoEnergia: 'OTRA', ubicacion: '', metodoAccion: '', dispositivoBloqueo: '', validacion: '' }]); setCatalogImages([{ url: '', etiqueta: '', ubicacionReferencia: '', orden: 1 }]); setCatalogMessage(''); setMode('catalog'); }}>Registrar máquina</button>
             <button type="button" className={mode === 'machines' ? 'secondary active-admin' : 'secondary'} onClick={() => { setMode('machines'); loadMachines(); }}>Ver máquinas</button>
             <button type="button" className={mode === 'active-events' ? 'secondary active-admin' : 'secondary'} onClick={() => { setMode('active-events'); loadActiveEvents(); }}>Eventos activos</button>
             <button type="button" className={mode === 'history' ? 'secondary active-admin' : 'secondary'} onClick={() => { setMode('history'); loadEventHistory(); }}>Historial</button>
@@ -903,7 +927,7 @@ export default function App() {
                     {selectedMachine.imagenes.map((image) => (
                       <figure key={image.id}>
                         <img src={image.url} alt={image.etiqueta || 'Imagen del paso 5'} />
-                        {image.etiqueta && <figcaption>{image.etiqueta}</figcaption>}
+                        {(image.etiqueta || image.ubicacionReferencia) && <figcaption>{image.etiqueta}{image.ubicacionReferencia ? ` · Paso 6: ${image.ubicacionReferencia}` : ''}</figcaption>}
                       </figure>
                     ))}
                   </div>
@@ -963,7 +987,7 @@ export default function App() {
           <section className="resume-section">
             <div className="machine-management-heading">
               <h2>{editingMachineId ? 'Editar máquina' : 'Registrar máquina'}</h2>
-              {editingMachineId && <button type="button" className="secondary" onClick={() => { setEditingMachineId(null); setCatalogMachine({ nombre: '', linea: '', qrCode: '' }); setCatalogPoints([{ identificador: '', nombre: '', tipoEnergia: 'OTRA', ubicacion: '', metodoAccion: '', dispositivoBloqueo: '', validacion: '' }]); setCatalogImages([{ url: '', etiqueta: 'Paso 5', orden: 1 }]); setCatalogMessage(''); }}>Nueva</button>}
+              {editingMachineId && <button type="button" className="secondary" onClick={() => { setEditingMachineId(null); setCatalogMachine({ nombre: '', linea: '', qrCode: '' }); setCatalogPoints([{ identificador: '', nombre: '', tipoEnergia: 'OTRA', ubicacion: '', metodoAccion: '', dispositivoBloqueo: '', validacion: '' }]); setCatalogImages([{ url: '', etiqueta: '', ubicacionReferencia: '', orden: 1 }]); setCatalogMessage(''); }}>Nueva</button>}
             </div>
             <label>
               Máquina
@@ -1058,6 +1082,9 @@ export default function App() {
             >
               + Agregar punto de bloqueo
             </button>
+            <button type="button" className="secondary" onClick={addEmergencyStop}>
+              + Agregar paro de emergencia
+            </button>
             </div>
 
             <label>Imágenes del paso 5</label>
@@ -1075,6 +1102,29 @@ export default function App() {
                   }}
                   placeholder="URL de la imagen"
                 />
+                <input
+                  value={image.etiqueta}
+                  onChange={(e) => {
+                    const updated = [...catalogImages];
+                    updated[index] = { ...updated[index], etiqueta: e.target.value };
+                    setCatalogImages(updated);
+                  }}
+                  placeholder="Nombre de la imagen"
+                />
+                <select
+                  value={image.ubicacionReferencia}
+                  onChange={(e) => {
+                    const updated = [...catalogImages];
+                    updated[index] = { ...updated[index], ubicacionReferencia: e.target.value };
+                    setCatalogImages(updated);
+                  }}
+                  aria-label={`Ubicación relacionada de la imagen ${index + 1}`}
+                >
+                  <option value="">Ubicación relacionada del paso 6</option>
+                  {catalogPoints.filter((point) => point.ubicacion.trim()).map((point, pointIndex) => (
+                    <option key={`${point.identificador}-${pointIndex}`} value={point.ubicacion}>{point.identificador || `P${pointIndex + 1}`} · {point.ubicacion}</option>
+                  ))}
+                </select>
                 {catalogImages.length > 1 && (
                   <button
                     type="button"
@@ -1092,7 +1142,7 @@ export default function App() {
               className="secondary"
               onClick={() => setCatalogImages([
                 ...catalogImages,
-                { url: '', etiqueta: `Imagen ${catalogImages.length + 1}`, orden: catalogImages.length + 1 }
+                { url: '', etiqueta: '', ubicacionReferencia: '', orden: catalogImages.length + 1 }
               ])}
             >
               + Agregar imagen del paso 5
@@ -1157,7 +1207,7 @@ export default function App() {
                         {machineInfo.imagenes.map((image, imageIndex) => (
                           <figure key={`${step?.pasoGenericoId || order}-${image.id || imageIndex}`}>
                             <img src={image.url} alt={image.etiqueta || `Imagen ${imageIndex + 1}`} />
-                            {image.etiqueta && <figcaption>{image.etiqueta}</figcaption>}
+                            {(image.etiqueta || image.ubicacionReferencia) && <figcaption>{image.etiqueta}{image.ubicacionReferencia ? ` · Paso 6: ${image.ubicacionReferencia}` : ''}</figcaption>}
                           </figure>
                         ))}
                       </div>

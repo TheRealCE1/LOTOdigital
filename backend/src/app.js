@@ -200,6 +200,7 @@ app.post('/api/catalogo/maquinas', async (req, res) => {
         .map((imagen, index) => ({
           url: String(imagen?.url || '').trim(),
           etiqueta: String(imagen?.etiqueta || '').trim() || `Imagen ${index + 1}`,
+          ubicacionReferencia: String(imagen?.ubicacionReferencia || '').trim() || null,
           orden: Number(imagen?.orden || index + 1)
         }))
         .filter((imagen) => imagen.url)
@@ -262,6 +263,7 @@ app.post('/api/catalogo/maquinas', async (req, res) => {
             maquinaId: maquinaRegistro.id,
             url: imagen.url,
             etiqueta: imagen.etiqueta,
+            ubicacionReferencia: imagen.ubicacionReferencia,
             orden: imagen.orden
           }
         });
