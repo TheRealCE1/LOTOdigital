@@ -302,6 +302,32 @@ app.get('/api/eventos/activos', async (req, res) => {
   res.json(eventos);
 });
 
+app.get('/api/eventos/:id', async (req, res) => {
+  const eventoId = Number(req.params.id);
+
+  if (!Number.isInteger(eventoId)) {
+    return res.status(400).json({ error: 'Identificador de evento no válido' });
+  }
+
+  await ensureGenericSteps(eventoId);
+
+  const evento = await prisma.eventoLOTO.findUnique({
+    where: { id: eventoId },
+    include: {
+      maquina: { include: { linea: true, imagenes: { orderBy: { orden: 'asc' } } } },
+      operador: true,
+      puntos: { include: { puntoBloqueo: true }, orderBy: { orden: 'asc' } },
+      pasosGenericos: { include: { pasoGenerico: true }, orderBy: { id: 'asc' } }
+    }
+  });
+
+  if (!evento) {
+    return res.status(404).json({ error: 'Evento no encontrado' });
+  }
+
+  return res.json({ evento });
+});
+
 app.post('/api/eventos/reanudar', async (req, res) => {
   const numeroEmpleado = normalizeEmployeeNumber(req.body.numeroEmpleado);
 
@@ -521,6 +547,8 @@ app.post('/api/eventos/:id/checkpoint', async (req, res) => {
     return res.status(400).json({ error: 'tipo de checkpoint no válido' });
   }
 
+  await ensureGenericSteps(Number(req.params.id));
+
   const evento = await prisma.eventoLOTO.findUnique({
     where: { id: Number(req.params.id) },
     include: {
@@ -555,7 +583,8 @@ app.post('/api/eventos/:id/checkpoint', async (req, res) => {
 
     const pasosPreviosCompletos = evento.pasosGenericos
       .filter((item) => item.tipo === 'CHECKIN' && item.pasoGenerico.orden <= 5)
-      .every((item) => item.completado);
+      .every((item) => item.completado) &&
+      evento.pasosGenericos.filter((item) => item.tipo === 'CHECKIN').length === 8;
 
     if (tipo === 'CHECKIN' && completado && !pasosPreviosCompletos) {
       return res.status(409).json({ error: 'Debes completar los pasos 1 al 5 antes de bloquear las fuentes de energía' });
@@ -765,7 +794,7 @@ app.post('/api/eventos/:id/checkout', async (req, res) => {
     .filter((item) => item.tipo === 'CHECKIN')
     .sort((a, b) => a.pasoGenerico.orden - b.pasoGenerico.orden);
 
-  const checkinCompleto = pasosCheckin.every((item) => item.completado) &&
+  const checkinCompleto = pasosCheckin.length === 8 && pasosCheckin.every((item) => item.completado) &&
     evento.maquina.puntos.every((punto) =>
       evento.puntos.some(
         (eventoPunto) => eventoPunto.puntoBloqueoId === punto.id &&

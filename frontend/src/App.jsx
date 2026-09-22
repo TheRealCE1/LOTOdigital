@@ -100,6 +100,8 @@ export default function App() {
     return checkinSteps.find((step) => step.pasoGenerico?.orden === order);
   }
 
+  const hasCompleteCheckinSteps = CHECKIN_STEP_ORDER.every((order) => Boolean(getCheckinStep(order)));
+
   function checkoutPendingMessage() {
     if (!checkoutServiceSteps.includes(5)) return 'Completa los pasos 1 al 5 de Check-out.';
     if (!checkoutPoints.every((point) => point.completado)) return 'Retira todos los candados y etiquetas del paso 6.';
@@ -417,6 +419,11 @@ export default function App() {
   }
 
   function loadEvent(savedEvent) {
+    const normalizedCheckinSteps = normalizeGenericSteps(savedEvent.pasosGenericos, 'CHECKIN');
+    const needsStepReload = savedEvent.id && !CHECKIN_STEP_ORDER.every((order) =>
+      normalizedCheckinSteps.some((step) => step.pasoGenerico?.orden === order)
+    );
+
     setEvent(savedEvent);
     setCheckinPoints(savedEvent.puntos?.filter((point) => point.tipo === 'CHECKIN') || []);
     setCheckoutPoints([...(savedEvent.puntos?.filter((point) => point.tipo === 'CHECKIN') || [])].reverse().map((point) => ({
@@ -425,10 +432,19 @@ export default function App() {
         (savedPoint) => savedPoint.puntoBloqueoId === point.puntoBloqueoId && savedPoint.tipo === 'CHECKOUT'
       )?.completado)
     })));
-    setCheckinSteps(normalizeGenericSteps(savedEvent.pasosGenericos, 'CHECKIN'));
+    setCheckinSteps(normalizedCheckinSteps);
     setCheckoutSteps(normalizeGenericSteps(savedEvent.pasosGenericos, 'CHECKOUT').reverse());
     setCheckoutServiceSteps(parseCheckoutSteps(savedEvent.checkoutPasos));
     setBaseConditionConfirmed(Boolean(savedEvent.confirmacionBase));
+
+    if (needsStepReload) {
+      fetch(`${API_URL}/eventos/${savedEvent.id}`)
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => {
+          if (data?.evento) loadEvent(data.evento);
+        })
+        .catch(() => setError('No se pudieron cargar los pasos completos de Check-in'));
+    }
   }
 
   async function resumeEvents() {
@@ -1089,7 +1105,7 @@ export default function App() {
                   <input
                     type="checkbox"
                     checked={point.completado}
-                    disabled={point.completado || !checkinSteps.filter((step) => step.pasoGenerico?.orden <= 5).every((step) => step.completado) || (index > 0 && !checkinPoints[index - 1].completado)}
+                    disabled={point.completado || !hasCompleteCheckinSteps || !checkinSteps.filter((step) => step.pasoGenerico?.orden <= 5).every((step) => step.completado) || (index > 0 && !checkinPoints[index - 1].completado)}
                     onChange={() => completeCheckinPoint(point, index)}
                   />
                   <span>{point.puntoBloqueo?.identificador || `P${index + 1}`}</span>
@@ -1123,7 +1139,7 @@ export default function App() {
               })}
             </ul>
 
-            <button className="primary" onClick={finishCheckin} disabled={!checkinSteps.every((step) => step.completado) || !checkinPoints.every((point) => point.completado)}>
+            <button className="primary" onClick={finishCheckin} disabled={!hasCompleteCheckinSteps || !checkinSteps.every((step) => step.completado) || !checkinPoints.every((point) => point.completado)}>
               Finalizar Check-in
             </button>
           </section>
