@@ -66,6 +66,56 @@ app.get('/api/lineas', async (req, res) => {
   res.json(lineas);
 });
 
+app.get('/api/catalogo/maquinas', async (req, res) => {
+  const maquinas = await prisma.maquina.findMany({
+    include: {
+      linea: true,
+      puntos: { orderBy: { orden: 'asc' } },
+      imagenes: { orderBy: { orden: 'asc' } },
+      bloqueoActivo: true
+    },
+    orderBy: [{ linea: { nombre: 'asc' } }, { nombre: 'asc' }]
+  });
+
+  res.json(maquinas);
+});
+
+app.delete('/api/catalogo/maquinas/:id', async (req, res) => {
+  const maquinaId = Number(req.params.id);
+
+  if (!Number.isInteger(maquinaId)) {
+    return res.status(400).json({ error: 'Identificador de máquina no válido' });
+  }
+
+  const maquina = await prisma.maquina.findUnique({
+    where: { id: maquinaId },
+    include: {
+      bloqueoActivo: true,
+      eventos: { select: { id: true }, take: 1 }
+    }
+  });
+
+  if (!maquina) {
+    return res.status(404).json({ error: 'Máquina no encontrada' });
+  }
+
+  if (maquina.bloqueoActivo) {
+    return res.status(409).json({ error: 'No se puede eliminar una máquina con un LOTO abierto' });
+  }
+
+  if (maquina.eventos.length > 0) {
+    return res.status(409).json({ error: 'No se puede eliminar una máquina con historial LOTO; el historial debe conservarse' });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.imagenMaquina.deleteMany({ where: { maquinaId } });
+    await tx.puntoBloqueo.deleteMany({ where: { maquinaId } });
+    await tx.maquina.delete({ where: { id: maquinaId } });
+  });
+
+  return res.json({ message: 'Máquina eliminada' });
+});
+
 app.post('/api/catalogo/maquinas', async (req, res) => {
   const { nombre, linea, qrCode, puntos = [], imagenes = [] } = req.body;
 

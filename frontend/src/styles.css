@@ -98,7 +98,7 @@ h1 {
 
 .mode-switch {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   padding: 4px;
   background: rgba(255, 255, 255, .045);
@@ -401,6 +401,73 @@ select option {
   flex-direction: column;
   gap: 8px;
   margin-bottom: 10px;
+}
+
+.machine-management {
+  border-top: 1px solid rgba(255, 255, 255, .72);
+  padding-top: 14px;
+}
+
+.machine-management-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.machine-management h2,
+.machine-management h3,
+.machine-management p {
+  margin: 0;
+}
+
+.machine-management h2 {
+  font-size: 1.1rem;
+}
+
+.machine-management h3 {
+  font-size: 1rem;
+}
+
+.machine-management p {
+  color: var(--txt2);
+  font-size: .86rem;
+}
+
+.machine-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.machine-list-item {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 2px;
+  padding: 10px 12px;
+  text-align: left;
+  background: rgba(255, 255, 255, .05);
+  color: var(--txt1);
+}
+
+.machine-list-item span {
+  color: var(--txt2);
+  font-size: .82rem;
+}
+
+.machine-list-item.active {
+  background: rgba(96, 165, 250, .18);
+  border: 1px solid rgba(147, 197, 253, .46);
+}
+
+.machine-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
 .lock-table {

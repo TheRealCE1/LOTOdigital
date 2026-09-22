@@ -26,6 +26,9 @@ export default function App() {
   }]);
   const [catalogImages, setCatalogImages] = useState([{ url: '', etiqueta: 'Paso 5', orden: 1 }]);
   const [catalogMessage, setCatalogMessage] = useState('');
+  const [machines, setMachines] = useState([]);
+  const [selectedMachine, setSelectedMachine] = useState(null);
+  const [machinesMessage, setMachinesMessage] = useState('');
   const [mode, setMode] = useState('checkin');
   const [scannerOpen, setScannerOpen] = useState(false);
   const [error, setError] = useState('');
@@ -167,6 +170,43 @@ export default function App() {
       setCatalogMessage('Máquina registrada y lista para Check-in');
     } catch (err) {
       setCatalogMessage('No se pudo conectar con el backend');
+    }
+  }
+
+  async function loadMachines() {
+    try {
+      const res = await fetch(`${API_URL}/catalogo/maquinas`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMachinesMessage(data?.error || 'No se pudieron cargar las máquinas');
+        return;
+      }
+
+      setMachines(data);
+      setSelectedMachine((current) => data.find((machine) => machine.id === current?.id) || data[0] || null);
+      setMachinesMessage(data.length ? '' : 'No hay máquinas registradas');
+    } catch (err) {
+      setMachinesMessage('No se pudo conectar con el backend');
+    }
+  }
+
+  async function deleteMachine(machine) {
+    if (!window.confirm(`¿Eliminar la máquina ${machine.nombre}? Esta acción no se puede deshacer.`)) return;
+
+    try {
+      const res = await fetch(`${API_URL}/catalogo/maquinas/${machine.id}`, { method: 'DELETE' });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMachinesMessage(data?.error || 'No se pudo eliminar la máquina');
+        return;
+      }
+
+      setMachinesMessage('Máquina eliminada');
+      await loadMachines();
+    } catch (err) {
+      setMachinesMessage('No se pudo conectar con el backend');
     }
   }
 
@@ -498,7 +538,86 @@ export default function App() {
           >
             Registrar máquina
           </button>
+          <button
+            className={mode === 'machines' ? 'mode-button active' : 'mode-button'}
+            onClick={() => { setMode('machines'); setEvent(null); setError(''); loadMachines(); }}
+          >
+            Ver máquinas
+          </button>
         </div>
+
+        {mode === 'machines' && (
+          <section className="machine-management">
+            <div className="machine-management-heading">
+              <h2>Máquinas registradas</h2>
+              <button type="button" className="secondary" onClick={loadMachines}>Actualizar</button>
+            </div>
+            {machines.length > 0 && (
+              <div className="machine-list" role="list">
+                {machines.map((machine) => (
+                  <button
+                    key={machine.id}
+                    type="button"
+                    className={selectedMachine?.id === machine.id ? 'machine-list-item active' : 'machine-list-item'}
+                    onClick={() => setSelectedMachine(machine)}
+                  >
+                    <strong>{machine.nombre}</strong>
+                    <span>{machine.linea?.nombre || 'Sin línea'} · {machine.qrCode}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {selectedMachine && (
+              <div className="machine-detail">
+                <div className="machine-management-heading">
+                  <div>
+                    <h3>{selectedMachine.nombre}</h3>
+                    <p>Línea {selectedMachine.linea?.nombre || 'Sin línea'} · QR: {selectedMachine.qrCode}</p>
+                  </div>
+                  <button type="button" className="danger" onClick={() => deleteMachine(selectedMachine)}>
+                    Eliminar
+                  </button>
+                </div>
+
+                <div className="lock-table" role="table" aria-label={`Bloqueos de ${selectedMachine.nombre}`}>
+                  <div className="lock-table-header" role="row">
+                    <span aria-hidden="true" />
+                    <span>ID</span>
+                    <span>Fuente</span>
+                    <span>Ubicación</span>
+                    <span>Método / acción</span>
+                    <span>Dispositivo de bloqueo</span>
+                    <span>Validación</span>
+                  </div>
+                  {selectedMachine.puntos.map((point, index) => (
+                    <div key={point.id} className="lock-table-row" role="row">
+                      <span><img className="energy-icon" src={energyImage(point.tipoEnergia)} alt="" /></span>
+                      <span>{point.identificador || `P${index + 1}`}</span>
+                      <span>{point.nombre} ({point.tipoEnergia})</span>
+                      <span>{point.ubicacion || 'Sin registrar'}</span>
+                      <span>{point.metodoAccion || 'Sin registrar'}</span>
+                      <span>{point.dispositivoBloqueo || 'Sin registrar'}</span>
+                      <span>{point.validacion || 'Sin registrar'}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {selectedMachine.imagenes.length > 0 && (
+                  <div className="step-images">
+                    {selectedMachine.imagenes.map((image) => (
+                      <figure key={image.id}>
+                        <img src={image.url} alt={image.etiqueta || 'Imagen del paso 5'} />
+                        {image.etiqueta && <figcaption>{image.etiqueta}</figcaption>}
+                      </figure>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {machinesMessage && <p className="status-message">{machinesMessage}</p>}
+          </section>
+        )}
 
         {mode === 'catalog' && (
           <section className="resume-section">
