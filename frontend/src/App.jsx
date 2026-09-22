@@ -100,6 +100,15 @@ export default function App() {
     return checkinSteps.find((step) => step.pasoGenerico?.orden === order);
   }
 
+  function checkoutPendingMessage() {
+    if (!checkoutServiceSteps.includes(5)) return 'Completa los pasos 1 al 5 de Check-out.';
+    if (!checkoutPoints.every((point) => point.completado)) return 'Retira todos los candados y etiquetas del paso 6.';
+    if (!checkoutServiceSteps.includes(6)) return 'Confirma la casilla principal del paso 6.';
+    if (!checkoutServiceSteps.includes(7)) return 'Completa el paso 7: verificar operación normal.';
+    if (!baseConditionConfirmed) return 'Confirma que la máquina quedó en condición base.';
+    return 'Checklist completo. Puedes cerrar el evento LOTO.';
+  }
+
   function energyImage(type) {
     return `/energy/${String(type || 'OTRA').toLowerCase()}.svg`;
   }
@@ -1174,6 +1183,10 @@ export default function App() {
               />
               <span>Al marcar esto estás de acuerdo que dejaste todo en condición base.</span>
             </label>
+
+            <p className={baseConditionConfirmed && checkoutServiceSteps.includes(7) && checkoutPoints.every((point) => point.completado) ? 'checkout-ready' : 'checkout-pending'}>
+              {checkoutPendingMessage()}
+            </p>
 
             <button className="danger" disabled={!checkoutPoints.every((point) => point.completado) || !checkoutServiceSteps.includes(7) || !baseConditionConfirmed} onClick={closeEvent}>
               Cerrar LOTO

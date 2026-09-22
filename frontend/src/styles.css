@@ -427,6 +427,27 @@ select option {
   flex-basis: 32px;
 }
 
+.checkout-pending,
+.checkout-ready {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: .9rem;
+  font-weight: 600;
+}
+
+.checkout-pending {
+  color: #fde68a;
+  background: rgba(202, 138, 4, .13);
+  border: 1px solid rgba(253, 230, 138, .24);
+}
+
+.checkout-ready {
+  color: #bbf7d0;
+  background: rgba(22, 163, 74, .14);
+  border: 1px solid rgba(187, 247, 208, .26);
+}
+
 .step-text {
   display: flex;
   flex-direction: column;
