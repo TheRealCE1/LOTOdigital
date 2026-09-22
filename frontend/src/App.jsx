@@ -13,6 +13,8 @@ const CHECKOUT_STEPS = [
   'Verificar que la máquina opere de manera normal.'
 ];
 
+const CHECKIN_STEP_ORDER = [1, 2, 3, 4, 5, 7, 8, 9];
+
 export default function App() {
   const [qrCode, setQrCode] = useState('');
   const [empleado, setEmpleado] = useState('');
@@ -92,6 +94,10 @@ export default function App() {
     } catch (err) {
       return [];
     }
+  }
+
+  function getCheckinStep(order) {
+    return checkinSteps.find((step) => step.pasoGenerico?.orden === order);
   }
 
   function energyImage(type) {
@@ -1029,18 +1035,21 @@ export default function App() {
             <h2>Checklist de bloqueo</h2>
 
             <ul className="step-list">
-              {checkinSteps.filter((step) => step.pasoGenerico?.orden <= 5).map((step, index) => (
-                <li key={`checkin-step-${step.pasoGenericoId || index}`} className="step-row">
+              {CHECKIN_STEP_ORDER.filter((order) => order <= 5).map((order, index) => {
+                const step = getCheckinStep(order);
+                const previousStep = index > 0 ? getCheckinStep(CHECKIN_STEP_ORDER[index - 1]) : null;
+
+                return <li key={`checkin-step-${order}`} className="step-row">
                   <input
                     type="checkbox"
-                    checked={Boolean(step.completado)}
-                    disabled={step.completado || (index > 0 && !checkinSteps[index - 1].completado)}
+                    checked={Boolean(step?.completado)}
+                    disabled={!step || step.completado || (index > 0 && !previousStep?.completado)}
                     onChange={() => completeCheckinStep(step)}
                   />
                   <div className="step-text">
-                    <strong>{step.pasoGenerico?.titulo || `Paso ${index + 1}`}</strong>
-                    <p>{step.pasoGenerico?.descripcion}</p>
-                    {step.pasoGenerico?.orden === 5 && machineInfo?.imagenes?.length > 0 && (
+                    <strong>{step?.pasoGenerico?.titulo || `Paso ${order}`}</strong>
+                    <p>{step?.pasoGenerico?.descripcion || 'Cargando paso de Check-in...'}</p>
+                    {order === 5 && machineInfo?.imagenes?.length > 0 && (
                       <div className="step-images">
                         {machineInfo.imagenes.map((image, imageIndex) => (
                           <figure key={`${step.pasoGenericoId}-${imageIndex}`}>
@@ -1052,7 +1061,7 @@ export default function App() {
                     )}
                   </div>
                 </li>
-              ))}
+              })}
             </ul>
 
             <div className="step-section-title">Paso 6: Bloquee las fuentes de energía</div>
@@ -1085,20 +1094,24 @@ export default function App() {
             </div>
 
             <ul className="step-list">
-              {checkinSteps.filter((step) => step.pasoGenerico?.orden >= 7).map((step, index) => (
-                <li key={`checkin-step-${step.pasoGenericoId || index}`} className="step-row">
+              {CHECKIN_STEP_ORDER.filter((order) => order >= 7).map((order, index) => {
+                const step = getCheckinStep(order);
+                const previousOrder = [5, 7, 8][index - 1];
+                const previousStep = index > 0 ? getCheckinStep(previousOrder) : null;
+
+                return <li key={`checkin-step-${order}`} className="step-row">
                   <input
                     type="checkbox"
-                    checked={Boolean(step.completado)}
-                    disabled={step.completado || (index > 0 && !checkinSteps.filter((item) => item.pasoGenerico?.orden >= 7)[index - 1].completado) || !checkinPoints.every((point) => point.completado)}
+                    checked={Boolean(step?.completado)}
+                    disabled={!step || step.completado || (index > 0 && !previousStep?.completado) || !checkinPoints.every((point) => point.completado)}
                     onChange={() => completeCheckinStep(step)}
                   />
                   <div className="step-text">
-                    <strong>{step.pasoGenerico?.titulo}</strong>
-                    <p>{step.pasoGenerico?.descripcion}</p>
+                    <strong>{step?.pasoGenerico?.titulo || `Paso ${order}`}</strong>
+                    <p>{step?.pasoGenerico?.descripcion || 'Cargando paso de Check-in...'}</p>
                   </div>
                 </li>
-              ))}
+              })}
             </ul>
 
             <button className="primary" onClick={finishCheckin} disabled={!checkinSteps.every((step) => step.completado) || !checkinPoints.every((point) => point.completado)}>

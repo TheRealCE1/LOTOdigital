@@ -1,5 +1,5 @@
 :root {
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-family: "Segoe UI", "Helvetica Neue", ui-sans-serif, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color: var(--txt1);
@@ -11,15 +11,21 @@
   --muted: rgba(255, 255, 255, .54);
   --blue: #60a5fa;
   --blue-deep: #93c5fd;
-  --surface: rgba(255, 255, 255, .07);
-  --surface-solid: rgba(255, 255, 255, .11);
-  --line: rgba(255, 255, 255, .10);
+  --surface: rgba(9, 24, 50, .86);
+  --surface-solid: rgba(255, 255, 255, .10);
+  --line: rgba(191, 219, 254, .16);
   --shadow-light: rgba(96, 165, 250, .08);
   --shadow-dark: rgba(0, 0, 0, .32);
 }
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -34,8 +40,10 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
+  -webkit-tap-highlight-color: transparent;
 }
 
 #root {
@@ -43,15 +51,15 @@ input {
 }
 
 .app-shell {
-  max-width: 520px;
+  max-width: 980px;
   margin: 0 auto;
-  padding: 32px 16px 48px;
+  padding: max(28px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(52px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
 }
 
 .topbar {
   display: flex;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .brand-lockup {
@@ -61,8 +69,8 @@ input {
 }
 
 .zf-mark {
-  width: 150px;
-  height: 150px;
+  width: 74px;
+  height: 74px;
   object-fit: contain;
   filter: drop-shadow(0 6px 18px rgba(37, 99, 235, .28));
 }
@@ -78,7 +86,7 @@ input {
 
 h1 {
   margin: 0;
-  font-size: 2rem;
+  font-size: 1.65rem;
   letter-spacing: 0.01em;
   color: var(--txt1);
 }
@@ -86,11 +94,11 @@ h1 {
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 24px;
-  box-shadow: 0 8px 32px var(--shadow-dark), inset 0 1px 0 rgba(255, 255, 255, .06);
+  border-radius: 10px;
+  box-shadow: 0 14px 42px var(--shadow-dark), inset 0 1px 0 rgba(255, 255, 255, .06);
   -webkit-backdrop-filter: blur(22px);
   backdrop-filter: blur(22px);
-  padding: 22px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -103,7 +111,7 @@ h1 {
   padding: 4px;
   background: rgba(255, 255, 255, .045);
   border: 1px solid rgba(255, 255, 255, .07);
-  border-radius: 14px;
+  border-radius: 8px;
   box-shadow: inset 3px 3px 8px rgba(0, 0, 0, .22), inset -3px -3px 8px rgba(255, 255, 255, .04);
 }
 
@@ -114,7 +122,7 @@ h1 {
 }
 
 .mode-button.active {
-  background: rgba(255, 255, 255, .11);
+  background: rgba(96, 165, 250, .20);
   color: white;
   box-shadow: 0 8px 24px rgba(0, 0, 0, .24), inset 0 1px 0 rgba(255, 255, 255, .08);
 }
@@ -127,8 +135,9 @@ label {
 }
 
 input {
+  min-height: 44px;
   border: 1px solid rgba(255, 255, 255, .12);
-  border-radius: 12px;
+  border-radius: 6px;
   padding: 12px 14px;
   color: var(--ink);
   background: rgba(255, 255, 255, .07);
@@ -136,16 +145,19 @@ input {
 }
 
 input:focus {
-  outline: 2px solid rgba(49, 91, 234, 0.34);
+  border-color: var(--blue);
+  outline: 2px solid rgba(96, 165, 250, .28);
   outline-offset: 2px;
 }
 
 button {
   border: none;
-  border-radius: 12px;
+  border-radius: 6px;
   padding: 12px 14px;
   font-weight: 700;
   cursor: pointer;
+  min-height: 44px;
+  touch-action: manipulation;
   transition: transform 140ms ease, box-shadow 140ms ease;
 }
 
@@ -160,15 +172,20 @@ button:disabled {
 }
 
 .primary {
-  background: #3b82f6;
+  background: #2563eb;
   color: white;
-  box-shadow: 6px 6px 12px rgba(79, 104, 157, 0.34), -5px -5px 11px rgba(255, 255, 255, 0.58);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, .24);
 }
 
 .secondary {
   background: var(--surface-solid);
   color: var(--txt1);
   box-shadow: 0 8px 20px rgba(0, 0, 0, .18), inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+
+.primary:hover:not(:disabled),
+.secondary:hover:not(:disabled) {
+  filter: brightness(1.12);
 }
 
 .qr-reader {
@@ -193,7 +210,7 @@ button:disabled {
 .machine-box {
   background: rgba(255, 255, 255, .06);
   border: 1px solid rgba(255, 255, 255, .08);
-  border-radius: 14px;
+  border-radius: 8px;
   padding: 12px 14px;
   color: var(--txt2);
   box-shadow: inset 3px 3px 8px rgba(0, 0, 0, .14), inset -3px -3px 8px rgba(255, 255, 255, .025);
@@ -204,12 +221,12 @@ button:disabled {
 }
 
 .checklist {
-  border-top: 1px solid rgba(255, 255, 255, 0.72);
+  border-top: 1px solid var(--line);
   padding-top: 14px;
 }
 
 .resume-section {
-  border-top: 1px solid rgba(255, 255, 255, 0.72);
+  border-top: 1px solid var(--line);
   padding-top: 14px;
 }
 
@@ -231,11 +248,12 @@ button:disabled {
 
 select {
   border: 1px solid rgba(255, 255, 255, .12);
-  border-radius: 12px;
+  border-radius: 6px;
   padding: 12px 14px;
   color: var(--txt1);
   background: rgba(255, 255, 255, .07);
   font: inherit;
+  min-height: 44px;
 }
 
 select option {
@@ -340,6 +358,13 @@ select option {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+}
+
+.step-row {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .025);
 }
 
 .step-row > input[type="checkbox"],
@@ -462,7 +487,7 @@ select option {
 }
 
 .machine-management {
-  border-top: 1px solid rgba(255, 255, 255, .72);
+  border-top: 1px solid var(--line);
   padding-top: 14px;
 }
 
@@ -470,7 +495,7 @@ select option {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  border-top: 1px solid rgba(255, 255, 255, .72);
+  border-top: 1px solid var(--line);
   padding-top: 14px;
 }
 
@@ -530,7 +555,8 @@ select option {
   gap: 2px;
   padding: 10px 12px;
   text-align: left;
-  background: rgba(255, 255, 255, .05);
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, .045);
   color: var(--txt1);
 }
 
@@ -595,7 +621,7 @@ select option {
 .lock-table {
   overflow-x: auto;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 6px;
   margin: 8px 0 16px;
 }
 
@@ -620,6 +646,69 @@ select option {
   border-top: 1px solid var(--line);
   color: var(--txt2);
   font-size: .86rem;
+}
+
+@media (min-width: 760px) {
+  .card {
+    padding: 24px;
+  }
+
+  .mode-switch {
+    max-width: 520px;
+  }
+
+  .checklist,
+  .resume-section,
+  .machine-management {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  body {
+    background-attachment: scroll;
+  }
+
+  .app-shell {
+    padding: max(18px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(36px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+
+  .zf-mark {
+    width: 56px;
+    height: 56px;
+  }
+
+  h1 {
+    font-size: 1.35rem;
+  }
+
+  .card {
+    padding: 16px;
+    gap: 14px;
+  }
+
+  .mode-switch {
+    gap: 4px;
+    padding: 3px;
+  }
+
+  .mode-button {
+    padding: 10px 6px;
+    font-size: .78rem;
+  }
+
+  input,
+  select {
+    font-size: 16px;
+  }
+
+  .active-event-row {
+    grid-template-columns: 1fr;
+  }
+
+  .machine-management-heading {
+    align-items: flex-start;
+  }
 }
 
 .lock-table-row > span:nth-child(3) {
