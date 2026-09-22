@@ -194,6 +194,10 @@ app.post('/api/catalogo/maquinas', async (req, res) => {
   const puntosValidos = Array.isArray(puntos) && puntos.length > 0
     ? puntos
     : [{ nombre: 'Bloqueo general', tipoEnergia: 'OTRA' }];
+  const puntosOrdenados = [
+    ...puntosValidos.filter((punto) => String(punto?.identificador || '').trim() !== 'PE1'),
+    ...puntosValidos.filter((punto) => String(punto?.identificador || '').trim() === 'PE1')
+  ];
 
   const imagenesValidas = Array.isArray(imagenes)
     ? imagenes
@@ -224,7 +228,7 @@ app.post('/api/catalogo/maquinas', async (req, res) => {
         }
       });
 
-      for (const [index, punto] of puntosValidos.entries()) {
+      for (const [index, punto] of puntosOrdenados.entries()) {
         await tx.puntoBloqueo.upsert({
           where: {
             maquinaId_orden: {

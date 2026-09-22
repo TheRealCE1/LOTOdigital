@@ -131,6 +131,11 @@ export default function App() {
   function energyImage(type) {
     return `/energy/${String(type || 'OTRA').toLowerCase()}.svg`;
   }
+  function pointIcon(point) {
+    return point?.identificador === 'PE1'
+      ? '/energy/paro-emergencia.svg'
+      : energyImage(point?.tipoEnergia);
+  }
 
   function updateCatalogPoint(index, field, value) {
     setCatalogPoints((current) => current.map((point, pointIndex) =>
@@ -152,12 +157,6 @@ export default function App() {
       metodoAccion: 'Presionar y bloquear el paro de emergencia',
       dispositivoBloqueo: 'Candado para paro de emergencia',
       validacion: 'Botón de paro activado'
-    }]);
-    setCatalogImages((current) => [...current, {
-      url: '/emergency-stop.svg',
-      etiqueta: 'Paro de emergencia',
-      ubicacionReferencia: 'Tablero de control',
-      orden: current.length + 1
     }]);
   }
 
@@ -1237,7 +1236,7 @@ export default function App() {
                     onChange={() => completeCheckinPoint(point, index)}
                   />
                   <span>{point.puntoBloqueo?.identificador || `P${index + 1}`}</span>
-                  <span><img className="energy-icon" src={energyImage(point.puntoBloqueo?.tipoEnergia)} alt="" />{point.puntoBloqueo?.nombre} ({point.puntoBloqueo?.tipoEnergia || 'OTRA'})</span>
+                  <span><img className="energy-icon" src={pointIcon(point.puntoBloqueo)} alt="" />{point.puntoBloqueo?.nombre} ({point.puntoBloqueo?.tipoEnergia || 'OTRA'})</span>
                   <span>{point.puntoBloqueo?.ubicacion || 'Sin registrar'}</span>
                   <span>{point.puntoBloqueo?.metodoAccion || 'Sin registrar'}</span>
                   <span>{point.puntoBloqueo?.dispositivoBloqueo || 'Sin registrar'}</span>
@@ -1307,7 +1306,7 @@ export default function App() {
                                 disabled={point.completado || !previousComplete || (pointIndex > 0 && !checkoutPoints[pointIndex - 1].completado)}
                                 onChange={() => completeCheckoutPoint(point, pointIndex)}
                               />
-                              <img className="energy-icon" src={energyImage(point.puntoBloqueo?.tipoEnergia)} alt="" />
+                              <img className="energy-icon" src={pointIcon(point.puntoBloqueo)} alt="" />
                               <span>{point.puntoBloqueo?.nombre} ({point.puntoBloqueo?.tipoEnergia || 'OTRA'})</span>
                             </label>
                           ))}
