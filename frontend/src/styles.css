@@ -480,14 +480,22 @@ select option {
 .step-images figure {
   margin: 0;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 6px;
+  background: rgba(255, 255, 255, .035);
+  border: 1px solid var(--line);
+  border-radius: 6px;
 }
 
 .step-images img {
   width: 100%;
-  height: 130px;
-  object-fit: cover;
+  height: auto;
+  max-height: 260px;
+  object-fit: contain;
   border-radius: 6px;
-  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, .18);
 }
 
 .step-images figcaption {
@@ -611,7 +619,7 @@ select option {
 
 .active-event-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   padding: 12px;
   background: rgba(255, 255, 255, .05);
@@ -635,6 +643,11 @@ select option {
 .active-event-row strong {
   color: var(--txt1);
   overflow-wrap: anywhere;
+}
+
+.admin-close-button {
+  align-self: end;
+  min-height: 40px;
 }
 
 .delete-password-field {

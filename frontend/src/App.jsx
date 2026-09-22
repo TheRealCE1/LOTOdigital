@@ -13,7 +13,18 @@ const CHECKOUT_STEPS = [
   'Verificar que la máquina opere de manera normal.'
 ];
 
-const CHECKIN_STEP_ORDER = [1, 2, 3, 4, 5, 7, 8, 9];
+const CHECKIN_STEPS = [
+  { orden: 1, descripcion: 'Identificar la máquina o equipo que se va a intervenir y las fuentes de energía potenciales con las que opera (eléctrica, neumática, mecánica, hidráulica, gas, vapor, gravedad, química, térmica y agua), los puntos de candadeo y etiquetado, y el equipo de bloqueo que se necesitan.' },
+  { orden: 2, descripcion: 'Notificar a los empleados que serán afectados o interrumpidos con este bloqueo, delimitar la zona de trabajo (cintas, poste delimitador, tablero, señal de alertas visible).' },
+  { orden: 3, descripcion: 'Apagar la máquina o equipo desde el interruptor o fuente principal de energía.' },
+  { orden: 4, descripcion: 'Solicitar un permiso de trabajo de riesgo y llenarlo de acuerdo al trabajo que se va a realizar.' },
+  { orden: 5, descripcion: 'Aislar las fuentes de energía identificadas en la máquina o equipo. Están señaladas en la(s) siguiente(s) imagen(es).' },
+  { orden: 7, descripcion: 'Liberar energía almacenada de manera controlada.' },
+  { orden: 8, descripcion: 'Verificar el bloqueo siguiendo las instrucciones de verificación del paso 5.' },
+  { orden: 9, descripcion: 'Mantener el bloqueo durante la intervención de la máquina o equipo.' }
+];
+
+const CHECKIN_STEP_ORDER = CHECKIN_STEPS.map((step) => step.orden);
 
 export default function App() {
   const [qrCode, setQrCode] = useState('');
@@ -47,6 +58,8 @@ export default function App() {
   const [activeMonitorEvents, setActiveMonitorEvents] = useState([]);
   const [monitorMessage, setMonitorMessage] = useState('');
   const [monitorNow, setMonitorNow] = useState(Date.now());
+  const [eventHistory, setEventHistory] = useState([]);
+  const [historyMessage, setHistoryMessage] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [mode, setMode] = useState('checkin');
@@ -98,6 +111,10 @@ export default function App() {
 
   function getCheckinStep(order) {
     return checkinSteps.find((step) => step.pasoGenerico?.orden === order);
+  }
+
+  function checkinDefinition(order) {
+    return CHECKIN_STEPS.find((step) => step.orden === order);
   }
 
   const hasCompleteCheckinSteps = CHECKIN_STEP_ORDER.every((order) => Boolean(getCheckinStep(order)));
@@ -272,6 +289,41 @@ export default function App() {
       setActiveMonitorEvents(data);
       setMonitorNow(Date.now());
       setMonitorMessage(data.length ? '' : 'No hay eventos LOTO activos');
+    } catch (err) {
+      setMonitorMessage('No se pudo conectar con el backend');
+    }
+  }
+
+  async function loadEventHistory() {
+    try {
+      const res = await fetch(`${API_URL}/eventos/historial`, { headers: catalogHeaders() });
+      const data = await res.json();
+      if (!res.ok) {
+        setHistoryMessage(data?.error || 'No se pudo cargar el historial');
+        return;
+      }
+      setEventHistory(data);
+      setHistoryMessage(data.length ? '' : 'No hay eventos registrados');
+    } catch (err) {
+      setHistoryMessage('No se pudo conectar con el backend');
+    }
+  }
+
+  async function adminCloseEvent(activeEvent) {
+    if (!window.confirm(`¿Cerrar administrativamente el evento de ${activeEvent.maquina?.nombre}?`)) return;
+
+    try {
+      const res = await fetch(`${API_URL}/eventos/${activeEvent.id}/cierre-administrativo`, {
+        method: 'POST',
+        headers: catalogHeaders()
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMonitorMessage(data?.error || 'No se pudo cerrar el evento');
+        return;
+      }
+      setMonitorMessage(data.message);
+      await loadActiveEvents();
     } catch (err) {
       setMonitorMessage('No se pudo conectar con el backend');
     }
@@ -753,7 +805,7 @@ export default function App() {
             Check-out
           </button>
           <button
-            className={['admin', 'catalog', 'machines', 'active-events'].includes(mode) ? 'mode-button active' : 'mode-button'}
+            className={['admin', 'catalog', 'machines', 'active-events', 'history'].includes(mode) ? 'mode-button active' : 'mode-button'}
             onClick={() => { setMode(adminUnlocked ? 'catalog' : 'admin'); setEvent(null); setError(''); setMachinesMessage(''); }}
           >
             Administración
@@ -777,11 +829,12 @@ export default function App() {
           </section>
         )}
 
-        {adminUnlocked && ['catalog', 'machines', 'active-events'].includes(mode) && (
+        {adminUnlocked && ['catalog', 'machines', 'active-events', 'history'].includes(mode) && (
           <div className="admin-navigation">
             <button type="button" className={mode === 'catalog' ? 'secondary active-admin' : 'secondary'} onClick={() => { setEditingMachineId(null); setCatalogMachine({ nombre: '', linea: '', qrCode: '' }); setCatalogPoints([{ identificador: '', nombre: '', tipoEnergia: 'OTRA', ubicacion: '', metodoAccion: '', dispositivoBloqueo: '', validacion: '' }]); setCatalogImages([{ url: '', etiqueta: 'Paso 5', orden: 1 }]); setCatalogMessage(''); setMode('catalog'); }}>Registrar máquina</button>
             <button type="button" className={mode === 'machines' ? 'secondary active-admin' : 'secondary'} onClick={() => { setMode('machines'); loadMachines(); }}>Ver máquinas</button>
             <button type="button" className={mode === 'active-events' ? 'secondary active-admin' : 'secondary'} onClick={() => { setMode('active-events'); loadActiveEvents(); }}>Eventos activos</button>
+            <button type="button" className={mode === 'history' ? 'secondary active-admin' : 'secondary'} onClick={() => { setMode('history'); loadEventHistory(); }}>Historial</button>
             <button type="button" className="secondary" onClick={() => { setAdminUnlocked(false); setAdminPassword(''); setMode('admin'); setMachines([]); setSelectedMachine(null); setActiveMonitorEvents([]); }}>Salir</button>
           </div>
         )}
@@ -874,11 +927,35 @@ export default function App() {
                     <div><span>Empleado</span><strong>{activeEvent.operador?.numeroEmpleado}</strong></div>
                     <div><span>Máquina</span><strong>{activeEvent.maquina?.nombre}</strong><small>{activeEvent.maquina?.linea?.nombre || 'Sin línea'}</small></div>
                     <div><span>Tiempo en LOTO</span><strong>{formatElapsed(activeEvent.horaInicio)}</strong></div>
+                    <button type="button" className="danger admin-close-button" onClick={() => adminCloseEvent(activeEvent)}>Cerrar evento</button>
                   </article>
                 ))}
               </div>
             )}
             {monitorMessage && <p className="status-message">{monitorMessage}</p>}
+          </section>
+        )}
+
+        {mode === 'history' && (
+          <section className="machine-management">
+            <div className="machine-management-heading">
+              <h2>Historial LOTO</h2>
+              <button type="button" className="secondary" onClick={loadEventHistory}>Actualizar</button>
+            </div>
+            {eventHistory.length > 0 && (
+              <div className="active-event-list">
+                {eventHistory.map((historyEvent) => (
+                  <article key={historyEvent.id} className="active-event-row">
+                    <div><span>Estado</span><strong>{historyEvent.estado}</strong></div>
+                    <div><span>Empleado</span><strong>{historyEvent.operador?.numeroEmpleado}</strong></div>
+                    <div><span>Máquina</span><strong>{historyEvent.maquina?.nombre}</strong><small>{historyEvent.maquina?.linea?.nombre || 'Sin línea'}</small></div>
+                    <div><span>Inicio</span><strong>{new Date(historyEvent.horaInicio).toLocaleString('es-MX')}</strong></div>
+                    <div><span>Duración</span><strong>{historyEvent.duracionMinutos == null ? 'En curso' : `${historyEvent.duracionMinutos} min`}</strong></div>
+                  </article>
+                ))}
+              </div>
+            )}
+            {historyMessage && <p className="status-message">{historyMessage}</p>}
           </section>
         )}
 
@@ -1062,6 +1139,7 @@ export default function App() {
             <ul className="step-list">
               {CHECKIN_STEP_ORDER.filter((order) => order <= 5).map((order, index) => {
                 const step = getCheckinStep(order);
+                const definition = checkinDefinition(order);
                 const previousStep = index > 0 ? getCheckinStep(CHECKIN_STEP_ORDER[index - 1]) : null;
 
                 return <li key={`checkin-step-${order}`} className="step-row">
@@ -1073,7 +1151,7 @@ export default function App() {
                   />
                   <div className="step-text">
                     <strong>{step?.pasoGenerico?.titulo || `Paso ${order}`}</strong>
-                    <p>{step?.pasoGenerico?.descripcion || 'Cargando paso de Check-in...'}</p>
+                    <p>{step?.pasoGenerico?.descripcion || definition?.descripcion}</p>
                     {order === 5 && machineInfo?.imagenes?.length > 0 && (
                       <div className="step-images">
                         {machineInfo.imagenes.map((image, imageIndex) => (
@@ -1121,6 +1199,7 @@ export default function App() {
             <ul className="step-list">
               {CHECKIN_STEP_ORDER.filter((order) => order >= 7).map((order, index) => {
                 const step = getCheckinStep(order);
+                const definition = checkinDefinition(order);
                 const previousOrder = [5, 7, 8][index - 1];
                 const previousStep = index > 0 ? getCheckinStep(previousOrder) : null;
 
@@ -1133,7 +1212,7 @@ export default function App() {
                   />
                   <div className="step-text">
                     <strong>{step?.pasoGenerico?.titulo || `Paso ${order}`}</strong>
-                    <p>{step?.pasoGenerico?.descripcion || 'Cargando paso de Check-in...'}</p>
+                    <p>{step?.pasoGenerico?.descripcion || definition?.descripcion}</p>
                   </div>
                 </li>
               })}

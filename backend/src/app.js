@@ -5,6 +5,16 @@ const prisma = require('./lib/prisma');
 
 const app = express();
 const CATALOG_PASSWORD = 'smartfactory';
+const GENERIC_STEPS = [
+  { orden: 1, titulo: 'Paso 1', descripcion: 'Identificar la máquina o equipo que se va a intervenir y las fuentes de energía potenciales con las que opera (eléctrica, neumática, mecánica, hidráulica, gas, vapor, gravedad, química, térmica y agua), los puntos de candadeo y etiquetado, y el equipo de bloqueo que se necesitan.' },
+  { orden: 2, titulo: 'Paso 2', descripcion: 'Notificar a los empleados que serán afectados o interrumpidos con este bloqueo, delimitar la zona de trabajo (cintas, poste delimitador, tablero, señal de alertas visible).' },
+  { orden: 3, titulo: 'Paso 3', descripcion: 'Apagar la máquina o equipo desde el interruptor o fuente principal de energía.' },
+  { orden: 4, titulo: 'Paso 4', descripcion: 'Solicitar un permiso de trabajo de riesgo y llenarlo de acuerdo al trabajo que se va a realizar.' },
+  { orden: 5, titulo: 'Paso 5', descripcion: 'Aislar las fuentes de energía identificadas en la máquina o equipo. Están señaladas en la(s) siguiente(s) imagen(es).' },
+  { orden: 7, titulo: 'Paso 7', descripcion: 'Liberar energía almacenada de manera controlada.' },
+  { orden: 8, titulo: 'Paso 8', descripcion: 'Verificar el bloqueo siguiendo las instrucciones de verificación del paso 5.' },
+  { orden: 9, titulo: 'Paso 9', descripcion: 'Mantener el bloqueo durante la intervención de la máquina o equipo.' }
+];
 
 app.use(cors());
 app.use(express.json());
@@ -59,7 +69,17 @@ function hasCatalogAccess(req) {
   return String(req.get('x-admin-password') || '') === CATALOG_PASSWORD;
 }
 
+async function ensureGenericDefinitions() {
+  return Promise.all(GENERIC_STEPS.map((paso) => prisma.pasoGenerico.upsert({
+    where: { orden: paso.orden },
+    update: paso,
+    create: paso
+  })));
+}
+
 async function ensureGenericSteps(eventoId) {
+  await ensureGenericDefinitions();
+
   const [pasos, existentes] = await Promise.all([
     prisma.pasoGenerico.findMany({ select: { id: true } }),
     prisma.eventoPasoGenerico.findMany({
@@ -302,6 +322,43 @@ app.get('/api/eventos/activos', async (req, res) => {
   res.json(eventos);
 });
 
+app.get('/api/eventos/historial', async (req, res) => {
+  if (!hasCatalogAccess(req)) {
+    return res.status(403).json({ error: 'Acceso de administración requerido' });
+  }
+
+  const eventos = await prisma.eventoLOTO.findMany({
+    include: { maquina: { include: { linea: true } }, operador: true },
+    orderBy: { horaInicio: 'desc' },
+    take: 200
+  });
+
+  return res.json(eventos);
+});
+
+app.post('/api/eventos/:id/cierre-administrativo', async (req, res) => {
+  if (!hasCatalogAccess(req)) {
+    return res.status(403).json({ error: 'Acceso de administración requerido' });
+  }
+
+  const evento = await prisma.eventoLOTO.findUnique({ where: { id: Number(req.params.id) } });
+  if (!evento) return res.status(404).json({ error: 'Evento no encontrado' });
+  if (evento.estado === 'CERRADO') return res.status(409).json({ error: 'El evento ya está cerrado' });
+
+  const cierre = new Date();
+  const cerrado = await prisma.$transaction(async (tx) => {
+    const actualizado = await tx.eventoLOTO.update({
+      where: { id: evento.id },
+      data: { estado: 'CERRADO', horaFin: cierre, duracionMinutos: Math.max(0, Math.round((cierre - new Date(evento.horaInicio)) / 60000)) },
+      include: { maquina: { include: { linea: true } }, operador: true }
+    });
+    await tx.bloqueoMaquina.deleteMany({ where: { eventoId: evento.id } });
+    return actualizado;
+  });
+
+  return res.json({ message: 'Evento cerrado por administración', evento: cerrado });
+});
+
 app.get('/api/eventos/:id', async (req, res) => {
   const eventoId = Number(req.params.id);
 
@@ -383,6 +440,8 @@ app.post('/api/eventos/checkin', async (req, res) => {
   if (!qrCode || !numeroEmpleado) {
     return res.status(400).json({ error: 'qrCode y numeroEmpleado son obligatorios' });
   }
+
+  await ensureGenericDefinitions();
 
   const maquina = await prisma.maquina.findUnique({
     where: { qrCode },
