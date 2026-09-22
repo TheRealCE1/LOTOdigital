@@ -65,12 +65,14 @@ select {
 .brand-lockup {
   display: flex;
   align-items: center;
-  gap: 14px;
+  justify-content: flex-start;
+  gap: 10px;
 }
 
 .zf-mark {
-  width: 74px;
-  height: 74px;
+  width: 112px;
+  height: 112px;
+  flex: 0 0 112px;
   object-fit: contain;
   filter: drop-shadow(0 6px 18px rgba(37, 99, 235, .28));
 }
@@ -81,7 +83,7 @@ select {
   letter-spacing: 0.08em;
   font-size: 12px;
   font-weight: 700;
-  margin: 0 0 8px;
+  margin: 0 0 4px;
 }
 
 h1 {
@@ -674,8 +676,9 @@ select option {
   }
 
   .zf-mark {
-    width: 56px;
-    height: 56px;
+    width: 68px;
+    height: 68px;
+    flex-basis: 68px;
   }
 
   h1 {
