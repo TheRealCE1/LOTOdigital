@@ -15,7 +15,15 @@ export default function App() {
   const [recoveryEmployee, setRecoveryEmployee] = useState('');
   const [activeEvents, setActiveEvents] = useState([]);
   const [catalogMachine, setCatalogMachine] = useState({ nombre: '', linea: '', qrCode: '' });
-  const [catalogPoints, setCatalogPoints] = useState([{ nombre: '', tipoEnergia: 'OTRA' }]);
+  const [catalogPoints, setCatalogPoints] = useState([{
+    identificador: '',
+    nombre: '',
+    tipoEnergia: 'OTRA',
+    ubicacion: '',
+    metodoAccion: '',
+    dispositivoBloqueo: '',
+    validacion: ''
+  }]);
   const [catalogImages, setCatalogImages] = useState([{ url: '', etiqueta: 'Paso 5', orden: 1 }]);
   const [catalogMessage, setCatalogMessage] = useState('');
   const [mode, setMode] = useState('checkin');
@@ -59,6 +67,12 @@ export default function App() {
 
   function energyImage(type) {
     return `/energy/${String(type || 'OTRA').toLowerCase()}.svg`;
+  }
+
+  function updateCatalogPoint(index, field, value) {
+    setCatalogPoints((current) => current.map((point, pointIndex) =>
+      pointIndex === index ? { ...point, [field]: value } : point
+    ));
   }
 
   useEffect(() => {
@@ -212,6 +226,7 @@ export default function App() {
         return;
       }
 
+      setResolvedMachine(data.maquina);
       loadEvent(data.evento);
       setMode('checkin');
       setError('');
@@ -501,33 +516,36 @@ export default function App() {
             </label>
 
             <label>Puntos de bloqueo</label>
+            <div className="lock-table catalog-lock-table" role="table" aria-label="Fuentes de energía de la máquina">
+              <div className="lock-table-header" role="row">
+                <span>ID</span>
+                <span>Fuente</span>
+                <span>Ubicación</span>
+                <span>Método / acción</span>
+                <span>Dispositivo de bloqueo</span>
+                <span>Validación</span>
+              </div>
             {catalogPoints.map((point, index) => (
-              <div key={index} className="lock-point-row">
+              <div key={index} className="lock-point-row lock-table-row" role="row">
                 <input
-                  value={point.nombre}
-                  onChange={(e) => {
-                    const updated = [...catalogPoints];
-                    updated[index] = {
-                      ...updated[index],
-                      nombre: e.target.value
-                    };
-                    setCatalogPoints(updated);
-                  }}
-                  placeholder={`Punto de bloqueo ${index + 1}`}
+                  value={point.identificador}
+                  onChange={(e) => updateCatalogPoint(index, 'identificador', e.target.value)}
+                  placeholder={`E${index + 1}`}
+                  aria-label={`ID del punto ${index + 1}`}
                 />
 
                 <div className="energy-picker">
                   <img className="energy-picker-icon" src={energyImage(point.tipoEnergia)} alt="" />
+                  <input
+                    value={point.nombre}
+                    onChange={(e) => updateCatalogPoint(index, 'nombre', e.target.value)}
+                    placeholder="Ej. Eléctrica 440 V"
+                    aria-label={`Fuente del punto ${index + 1}`}
+                  />
                   <select
                     value={point.tipoEnergia}
-                    onChange={(e) => {
-                      const updated = [...catalogPoints];
-                      updated[index] = {
-                        ...updated[index],
-                        tipoEnergia: e.target.value
-                      };
-                      setCatalogPoints(updated);
-                    }}
+                    onChange={(e) => updateCatalogPoint(index, 'tipoEnergia', e.target.value)}
+                    aria-label={`Tipo de energía del punto ${index + 1}`}
                   >
                     <option value="ELECTRICA">Eléctrica</option>
                     <option value="NEUMATICA">Neumática</option>
@@ -537,6 +555,11 @@ export default function App() {
                     <option value="OTRA">Otra</option>
                   </select>
                 </div>
+
+                <input value={point.ubicacion} onChange={(e) => updateCatalogPoint(index, 'ubicacion', e.target.value)} placeholder="Ej. Parte trasera lado izquierdo" aria-label={`Ubicación del punto ${index + 1}`} />
+                <input value={point.metodoAccion} onChange={(e) => updateCatalogPoint(index, 'metodoAccion', e.target.value)} placeholder="Ej. Abrir interruptor" aria-label={`Método o acción del punto ${index + 1}`} />
+                <input value={point.dispositivoBloqueo} onChange={(e) => updateCatalogPoint(index, 'dispositivoBloqueo', e.target.value)} placeholder="Ej. Candado y etiqueta" aria-label={`Dispositivo de bloqueo del punto ${index + 1}`} />
+                <input value={point.validacion} onChange={(e) => updateCatalogPoint(index, 'validacion', e.target.value)} placeholder="Ej. Sin tensión" aria-label={`Validación del punto ${index + 1}`} />
 
                 {catalogPoints.length > 1 && (
                   <button
@@ -558,12 +581,21 @@ export default function App() {
               onClick={() =>
                 setCatalogPoints([
                   ...catalogPoints,
-                  { nombre: '', tipoEnergia: 'OTRA' }
+                  {
+                    identificador: '',
+                    nombre: '',
+                    tipoEnergia: 'OTRA',
+                    ubicacion: '',
+                    metodoAccion: '',
+                    dispositivoBloqueo: '',
+                    validacion: ''
+                  }
                 ])
               }
             >
               + Agregar punto de bloqueo
             </button>
+            </div>
 
             <label>Imágenes del paso 5</label>
             {catalogImages.map((image, index) => (
@@ -642,7 +674,7 @@ export default function App() {
             <h2>Checklist de bloqueo</h2>
 
             <ul className="step-list">
-              {checkinSteps.map((step, index) => (
+              {checkinSteps.filter((step) => step.pasoGenerico?.orden <= 5).map((step, index) => (
                 <li key={`checkin-step-${step.pasoGenericoId || index}`} className="step-row">
                   <input
                     type="checkbox"
@@ -669,17 +701,47 @@ export default function App() {
             </ul>
 
             <div className="step-section-title">Paso 6: Bloquee las fuentes de energía</div>
-            <ul className="step-list">
+            <div className="lock-table" role="table" aria-label="Puntos de bloqueo">
+              <div className="lock-table-header" role="row">
+                <span aria-hidden="true" />
+                <span>ID</span>
+                <span>Fuente</span>
+                <span>Ubicación</span>
+                <span>Método / acción</span>
+                <span>Dispositivo de bloqueo</span>
+                <span>Validación</span>
+              </div>
               {checkinPoints.map((point, index) => (
-                <li key={point.puntoBloqueoId} className="point-row">
+                <div key={point.puntoBloqueoId} className="point-row lock-table-row" role="row">
                   <input
                     type="checkbox"
                     checked={point.completado}
-                    disabled={point.completado || (index > 0 && !checkinPoints[index - 1].completado)}
+                    disabled={point.completado || !checkinSteps.filter((step) => step.pasoGenerico?.orden <= 5).every((step) => step.completado) || (index > 0 && !checkinPoints[index - 1].completado)}
                     onChange={() => completeCheckinPoint(point, index)}
                   />
-                  <img className="energy-icon" src={energyImage(point.puntoBloqueo?.tipoEnergia)} alt="" />
-                  <span>{point.puntoBloqueo?.nombre} ({point.puntoBloqueo?.tipoEnergia || 'OTRA'})</span>
+                  <span>{point.puntoBloqueo?.identificador || `P${index + 1}`}</span>
+                  <span><img className="energy-icon" src={energyImage(point.puntoBloqueo?.tipoEnergia)} alt="" />{point.puntoBloqueo?.nombre} ({point.puntoBloqueo?.tipoEnergia || 'OTRA'})</span>
+                  <span>{point.puntoBloqueo?.ubicacion || 'Sin registrar'}</span>
+                  <span>{point.puntoBloqueo?.metodoAccion || 'Sin registrar'}</span>
+                  <span>{point.puntoBloqueo?.dispositivoBloqueo || 'Sin registrar'}</span>
+                  <span>{point.puntoBloqueo?.validacion || 'Confirmar bloqueo'}</span>
+                </div>
+              ))}
+            </div>
+
+            <ul className="step-list">
+              {checkinSteps.filter((step) => step.pasoGenerico?.orden >= 7).map((step, index) => (
+                <li key={`checkin-step-${step.pasoGenericoId || index}`} className="step-row">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(step.completado)}
+                    disabled={step.completado || (index > 0 && !checkinSteps.filter((item) => item.pasoGenerico?.orden >= 7)[index - 1].completado) || !checkinPoints.every((point) => point.completado)}
+                    onChange={() => completeCheckinStep(step)}
+                  />
+                  <div className="step-text">
+                    <strong>{step.pasoGenerico?.titulo}</strong>
+                    <p>{step.pasoGenerico?.descripcion}</p>
+                  </div>
                 </li>
               ))}
             </ul>

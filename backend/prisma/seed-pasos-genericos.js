@@ -5,7 +5,7 @@ const pasos = [
   {
     orden: 1,
     titulo: 'Paso 1',
-    descripcion: 'Identificar la máquina o equipo que se va a intervenir y sus fuentes de energía potenciales con las que opera (eléctrica, neumática, mecánica, hidráulica, gas, vapor, gravedad, química, térmica y agua).'
+    descripcion: 'Identificar la máquina o equipo que se va a intervenir y las fuentes de energía potenciales con las que opera (eléctrica, neumática, mecánica, hidráulica, gas, vapor, gravedad, química, térmica y agua), los puntos de candadeo y etiquetado, y el equipo de bloqueo que se necesitan.'
   },
   {
     orden: 2,
@@ -25,7 +25,7 @@ const pasos = [
   {
     orden: 5,
     titulo: 'Paso 5',
-    descripcion: 'Aislar las fuentes de energía identificadas en la máquina o equipo, están señaladas en la(s) siguiente(s) imagen(es)'
+    descripcion: 'Aislar las fuentes de energía identificadas en la máquina o equipo. Están señaladas en la(s) siguiente(s) imagen(es).'
   },
   {
     orden: 7,

@@ -26,13 +26,18 @@ model Maquina {
 }
 
 model PuntoBloqueo {
-  id            Int             @id @default(autoincrement())
-  nombre        String
-  tipoEnergia   TipoEnergia     @default(OTRA)
-  orden         Int
-  maquinaId     Int
-  maquina       Maquina         @relation(fields: [maquinaId], references: [id])
-  eventoPuntos  EventoPunto[]
+  id                  Int             @id @default(autoincrement())
+  nombre              String
+  tipoEnergia         TipoEnergia     @default(OTRA)
+  identificador       String?
+  ubicacion           String?
+  metodoAccion        String?
+  dispositivoBloqueo  String?
+  validacion          String?
+  orden               Int
+  maquinaId           Int
+  maquina             Maquina         @relation(fields: [maquinaId], references: [id])
+  eventoPuntos        EventoPunto[]
 
   @@unique([maquinaId, orden])
 }

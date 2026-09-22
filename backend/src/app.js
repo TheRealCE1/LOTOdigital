@@ -117,11 +117,21 @@ app.post('/api/catalogo/maquinas', async (req, res) => {
           },
           update: {
             nombre: String(punto.nombre || `Punto ${index + 1}`).trim(),
-            tipoEnergia: punto.tipoEnergia || 'OTRA'
+            tipoEnergia: punto.tipoEnergia || 'OTRA',
+            identificador: String(punto.identificador || '').trim() || null,
+            ubicacion: String(punto.ubicacion || '').trim() || null,
+            metodoAccion: String(punto.metodoAccion || '').trim() || null,
+            dispositivoBloqueo: String(punto.dispositivoBloqueo || '').trim() || null,
+            validacion: String(punto.validacion || '').trim() || null
           },
           create: {
             nombre: String(punto.nombre || `Punto ${index + 1}`).trim(),
             tipoEnergia: punto.tipoEnergia || 'OTRA',
+            identificador: String(punto.identificador || '').trim() || null,
+            ubicacion: String(punto.ubicacion || '').trim() || null,
+            metodoAccion: String(punto.metodoAccion || '').trim() || null,
+            dispositivoBloqueo: String(punto.dispositivoBloqueo || '').trim() || null,
+            validacion: String(punto.validacion || '').trim() || null,
             orden: index + 1,
             maquinaId: maquinaRegistro.id
           }
@@ -414,6 +424,14 @@ app.post('/api/eventos/:id/checkpoint', async (req, res) => {
       return res.status(400).json({ error: 'El punto no pertenece a la máquina del evento' });
     }
 
+    const pasosPreviosCompletos = evento.pasosGenericos
+      .filter((item) => item.tipo === 'CHECKIN' && item.pasoGenerico.orden <= 5)
+      .every((item) => item.completado);
+
+    if (tipo === 'CHECKIN' && completado && !pasosPreviosCompletos) {
+      return res.status(409).json({ error: 'Debes completar los pasos 1 al 5 antes de bloquear las fuentes de energía' });
+    }
+
     if (completado) {
       const puntosOrdenados = tipo === 'CHECKIN'
         ? evento.maquina.puntos
@@ -464,6 +482,16 @@ app.post('/api/eventos/:id/checkpoint', async (req, res) => {
 
   if (!paso) {
     return res.status(400).json({ error: 'El paso no pertenece al checklist del evento' });
+  }
+
+  const bloqueosCompletos = evento.maquina.puntos.every((punto) =>
+    evento.puntos.some((item) =>
+      item.puntoBloqueoId === punto.id && item.tipo === 'CHECKIN' && item.completado
+    )
+  );
+
+  if (tipo === 'CHECKIN' && completado && paso.pasoGenerico.orden >= 7 && !bloqueosCompletos) {
+    return res.status(409).json({ error: 'Debes completar el paso 6 antes de continuar' });
   }
 
   const pasoOrdenado = [...evento.pasosGenericos]

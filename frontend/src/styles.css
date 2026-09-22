@@ -402,3 +402,62 @@ select option {
   gap: 8px;
   margin-bottom: 10px;
 }
+
+.lock-table {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 8px 0 16px;
+}
+
+.lock-table-header,
+.lock-table-row {
+  min-width: 860px;
+  display: grid;
+  grid-template-columns: 42px 70px minmax(180px, 1.2fr) repeat(4, minmax(150px, 1fr));
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+}
+
+.lock-table-header {
+  background: rgba(96, 165, 250, .14);
+  color: var(--blue-deep);
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.lock-table-row {
+  border-top: 1px solid var(--line);
+  color: var(--txt2);
+  font-size: .86rem;
+}
+
+.lock-table-row > span:nth-child(3) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.catalog-lock-table .lock-table-header,
+.catalog-lock-table .lock-table-row {
+  min-width: 980px;
+  grid-template-columns: 70px minmax(220px, 1.25fr) repeat(4, minmax(150px, 1fr));
+}
+
+.catalog-lock-table .lock-point-row {
+  align-items: start;
+}
+
+.catalog-lock-table .energy-picker {
+  min-width: 0;
+}
+
+.catalog-lock-table .energy-picker input {
+  min-width: 0;
+}
+
+.catalog-lock-table .secondary {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
