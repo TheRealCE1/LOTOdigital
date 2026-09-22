@@ -54,6 +54,26 @@ function normalizeEmployeeNumber(value) {
   return String(value || '').trim();
 }
 
+async function ensureGenericSteps(eventoId) {
+  const [pasos, existentes] = await Promise.all([
+    prisma.pasoGenerico.findMany({ select: { id: true } }),
+    prisma.eventoPasoGenerico.findMany({
+      where: { eventoId },
+      select: { pasoGenericoId: true, tipo: true }
+    })
+  ]);
+
+  const existentesPorPaso = new Set(existentes.map((item) => `${item.pasoGenericoId}-${item.tipo}`));
+  const faltantes = pasos.flatMap((paso) => ['CHECKIN', 'CHECKOUT']
+    .filter((tipo) => !existentesPorPaso.has(`${paso.id}-${tipo}`))
+    .map((tipo) => ({ eventoId, pasoGenericoId: paso.id, tipo }))
+  );
+
+  if (faltantes.length) {
+    await prisma.eventoPasoGenerico.createMany({ data: faltantes });
+  }
+}
+
 app.get('/health', (req, res) => {
   res.json({ ok: true, message: 'LOTO API funcionando' });
 });
@@ -259,7 +279,7 @@ app.post('/api/eventos/reanudar', async (req, res) => {
     return res.status(400).json({ error: 'numeroEmpleado es obligatorio' });
   }
 
-  const eventos = await prisma.eventoLOTO.findMany({
+  let eventos = await prisma.eventoLOTO.findMany({
     where: { estado: 'ABIERTO' },
     include: {
       maquina: { include: { linea: true, imagenes: { orderBy: { orden: 'asc' } } } },
@@ -276,11 +296,28 @@ app.post('/api/eventos/reanudar', async (req, res) => {
     orderBy: { horaInicio: 'desc' }
   });
 
-  res.json({
-    eventos: eventos.filter((evento) =>
+  const eventosOperador = eventos.filter((evento) =>
       normalizeEmployeeNumber(evento.operador.numeroEmpleado) === numeroEmpleado
-    )
-  });
+    );
+
+  await Promise.all(eventosOperador.map((evento) => ensureGenericSteps(evento.id)));
+
+  if (eventosOperador.some((evento) => evento.pasosGenericos.length < 16)) {
+    eventos = await prisma.eventoLOTO.findMany({
+      where: { id: { in: eventosOperador.map((evento) => evento.id) } },
+      include: {
+        maquina: { include: { linea: true, imagenes: { orderBy: { orden: 'asc' } } } },
+        operador: true,
+        puntos: { include: { puntoBloqueo: true }, orderBy: { orden: 'asc' } },
+        pasosGenericos: { include: { pasoGenerico: true }, orderBy: { id: 'asc' } }
+      },
+      orderBy: { horaInicio: 'desc' }
+    });
+  } else {
+    eventos = eventosOperador;
+  }
+
+  res.json({ eventos });
 });
 
 app.post('/api/eventos/checkin', async (req, res) => {
@@ -323,6 +360,7 @@ app.post('/api/eventos/checkin', async (req, res) => {
 
   if (eventoAbierto) {
     if (normalizeEmployeeNumber(eventoAbierto.operador.numeroEmpleado) === numeroEmpleado) {
+      await ensureGenericSteps(eventoAbierto.id);
       const eventoActivo = await prisma.eventoLOTO.findUnique({
         where: { id: eventoAbierto.id },
         include: {
