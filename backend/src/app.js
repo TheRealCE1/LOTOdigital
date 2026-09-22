@@ -484,6 +484,17 @@ app.post('/api/eventos/checkin', async (req, res) => {
     throw error;
   }
 
+  await ensureGenericSteps(evento.id);
+  evento = await prisma.eventoLOTO.findUnique({
+    where: { id: evento.id },
+    include: {
+      maquina: { include: { linea: true, imagenes: { orderBy: { orden: 'asc' } } } },
+      operador: true,
+      puntos: { include: { puntoBloqueo: true }, orderBy: { orden: 'asc' } },
+      pasosGenericos: { include: { pasoGenerico: true }, orderBy: { id: 'asc' } }
+    }
+  });
+
   res.status(201).json({
     message: 'LOTO abierto correctamente',
     evento,

@@ -467,7 +467,7 @@ export default function App() {
           setCheckoutPoints([]);
           setCheckinSteps([]);
           setCheckoutSteps([]);
-          setMode('checkout');
+          setMode('checkin');
           setError('Esta sesión ya fue cerrada. Busca otra sesión activa.');
           return;
         }
@@ -511,7 +511,7 @@ export default function App() {
           setCheckoutPoints([]);
           setCheckinSteps([]);
           setCheckoutSteps([]);
-          setMode('checkout');
+          setMode('checkin');
           setError('Esta sesión ya fue cerrada. Busca otra sesión activa.');
           return;
         }
@@ -552,7 +552,7 @@ export default function App() {
           setCheckoutPoints([]);
           setCheckinSteps([]);
           setCheckoutSteps([]);
-          setMode('checkout');
+          setMode('checkin');
           setError('Esta sesión ya fue cerrada. Busca otra sesión activa.');
           return;
         }
@@ -567,6 +567,26 @@ export default function App() {
     } catch (err) {
       setError('No se pudo guardar el paso');
     }
+  }
+
+  function finishCheckin() {
+    const genericStepsComplete = checkinSteps.every((step) => step.completado);
+    const lockoutPointsComplete = checkinPoints.every((point) => point.completado);
+
+    if (!genericStepsComplete || !lockoutPointsComplete) {
+      setError('Completa todos los pasos y bloqueos antes de finalizar el Check-in');
+      return;
+    }
+
+    setEvent(null);
+    setCheckinPoints([]);
+    setCheckoutPoints([]);
+    setCheckinSteps([]);
+    setCheckoutSteps([]);
+    setCheckoutServiceSteps([]);
+    setBaseConditionConfirmed(false);
+    setMode('checkin');
+    setError('Check-in finalizado. El LOTO permanece abierto hasta realizar el Check-out.');
   }
 
   async function completeCheckoutStep(step) {
@@ -1081,8 +1101,8 @@ export default function App() {
               ))}
             </ul>
 
-            <button className="secondary" onClick={() => setMode('checkout')}>
-              Ir a Check-out cuando termine el trabajo
+            <button className="primary" onClick={finishCheckin} disabled={!checkinSteps.every((step) => step.completado) || !checkinPoints.every((point) => point.completado)}>
+              Finalizar Check-in
             </button>
           </section>
         )}
