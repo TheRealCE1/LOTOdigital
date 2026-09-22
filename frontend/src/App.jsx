@@ -1061,7 +1061,7 @@ export default function App() {
                     {order === 5 && machineInfo?.imagenes?.length > 0 && (
                       <div className="step-images">
                         {machineInfo.imagenes.map((image, imageIndex) => (
-                          <figure key={`${step.pasoGenericoId}-${imageIndex}`}>
+                          <figure key={`${step?.pasoGenericoId || order}-${image.id || imageIndex}`}>
                             <img src={image.url} alt={image.etiqueta || `Imagen ${imageIndex + 1}`} />
                             {image.etiqueta && <figcaption>{image.etiqueta}</figcaption>}
                           </figure>
