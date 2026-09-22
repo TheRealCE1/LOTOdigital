@@ -3,6 +3,16 @@ import { Html5Qrcode } from 'html5-qrcode';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
+const CHECKOUT_STEPS = [
+  'Verificar que las herramientas, refacciones y/o equipo utilizado para la intervención se retiren.',
+  'Orden y limpieza del área.',
+  'Volver a colocar las guardas y/o dispositivos de seguridad y validar su funcionamiento correcto.',
+  'Notificar a los empleados afectados o interrumpidos, en la intervención de la máquina o equipo, desenergizado.',
+  'Verificar que los dispositivos de arranque de la operación estén apagados (off).',
+  'Retirar los candados y etiquetas de los dispositivos intervenidos y colocar el interruptor o fuente principal de energía en encendido (on).',
+  'Verificar que la máquina opere de manera normal.'
+];
+
 export default function App() {
   const [qrCode, setQrCode] = useState('');
   const [empleado, setEmpleado] = useState('');
@@ -12,6 +22,8 @@ export default function App() {
   const [checkoutPoints, setCheckoutPoints] = useState([]);
   const [checkinSteps, setCheckinSteps] = useState([]);
   const [checkoutSteps, setCheckoutSteps] = useState([]);
+  const [checkoutServiceSteps, setCheckoutServiceSteps] = useState([]);
+  const [baseConditionConfirmed, setBaseConditionConfirmed] = useState(false);
   const [recoveryEmployee, setRecoveryEmployee] = useState('');
   const [activeEvents, setActiveEvents] = useState([]);
   const [catalogMachine, setCatalogMachine] = useState({ nombre: '', linea: '', qrCode: '' });
@@ -26,9 +38,15 @@ export default function App() {
   }]);
   const [catalogImages, setCatalogImages] = useState([{ url: '', etiqueta: 'Paso 5', orden: 1 }]);
   const [catalogMessage, setCatalogMessage] = useState('');
+  const [editingMachineId, setEditingMachineId] = useState(null);
   const [machines, setMachines] = useState([]);
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [machinesMessage, setMachinesMessage] = useState('');
+  const [activeMonitorEvents, setActiveMonitorEvents] = useState([]);
+  const [monitorMessage, setMonitorMessage] = useState('');
+  const [monitorNow, setMonitorNow] = useState(Date.now());
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [mode, setMode] = useState('checkin');
   const [scannerOpen, setScannerOpen] = useState(false);
   const [error, setError] = useState('');
@@ -68,6 +86,14 @@ export default function App() {
       }));
   }
 
+  function parseCheckoutSteps(value) {
+    try {
+      return JSON.parse(value || '[]');
+    } catch (err) {
+      return [];
+    }
+  }
+
   function energyImage(type) {
     return `/energy/${String(type || 'OTRA').toLowerCase()}.svg`;
   }
@@ -76,6 +102,20 @@ export default function App() {
     setCatalogPoints((current) => current.map((point, pointIndex) =>
       pointIndex === index ? { ...point, [field]: value } : point
     ));
+  }
+
+  function catalogHeaders(includeContentType = false) {
+    return {
+      ...(includeContentType ? { 'Content-Type': 'application/json' } : {}),
+      'X-Admin-Password': adminPassword
+    };
+  }
+
+  function formatElapsed(startedAt) {
+    const totalMinutes = Math.max(0, Math.floor((monitorNow - new Date(startedAt).getTime()) / 60000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours} h ${String(minutes).padStart(2, '0')} min`;
   }
 
   useEffect(() => {
@@ -136,6 +176,13 @@ export default function App() {
     };
   }, [scannerOpen]);
 
+  useEffect(() => {
+    if (mode !== 'active-events') return undefined;
+
+    const timer = window.setInterval(() => setMonitorNow(Date.now()), 60000);
+    return () => window.clearInterval(timer);
+  }, [mode]);
+
   async function registerMachine() {
     if (!catalogMachine.nombre.trim() || !catalogMachine.linea.trim() || !catalogMachine.qrCode.trim()) {
       setCatalogMessage('Captura máquina, línea y QR');
@@ -145,7 +192,7 @@ export default function App() {
     try {
       const res = await fetch(`${API_URL}/catalogo/maquinas`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: catalogHeaders(true),
         body: JSON.stringify({
           ...catalogMachine,
           puntos: catalogPoints.filter((point) => point.nombre.trim()),
@@ -167,7 +214,7 @@ export default function App() {
 
       setQrCode(data.maquina.qrCode);
       setResolvedMachine(data.maquina);
-      setCatalogMessage('Máquina registrada y lista para Check-in');
+      setCatalogMessage(editingMachineId ? 'Máquina actualizada' : 'Máquina registrada y lista para Check-in');
     } catch (err) {
       setCatalogMessage('No se pudo conectar con el backend');
     }
@@ -175,7 +222,9 @@ export default function App() {
 
   async function loadMachines() {
     try {
-      const res = await fetch(`${API_URL}/catalogo/maquinas`);
+      const res = await fetch(`${API_URL}/catalogo/maquinas`, {
+        headers: catalogHeaders()
+      });
       const data = await res.json();
 
       if (!res.ok) {
@@ -191,11 +240,61 @@ export default function App() {
     }
   }
 
+  async function loadActiveEvents() {
+    try {
+      const res = await fetch(`${API_URL}/eventos/activos`, {
+        headers: catalogHeaders()
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMonitorMessage(data?.error || 'No se pudieron cargar los eventos activos');
+        return;
+      }
+
+      setActiveMonitorEvents(data);
+      setMonitorNow(Date.now());
+      setMonitorMessage(data.length ? '' : 'No hay eventos LOTO activos');
+    } catch (err) {
+      setMonitorMessage('No se pudo conectar con el backend');
+    }
+  }
+
+  function editMachine(machine) {
+    setEditingMachineId(machine.id);
+    setCatalogMachine({
+      nombre: machine.nombre,
+      linea: machine.linea?.nombre || '',
+      qrCode: machine.qrCode
+    });
+    setCatalogPoints(machine.puntos.map((point) => ({
+      identificador: point.identificador || '',
+      nombre: point.nombre || '',
+      tipoEnergia: point.tipoEnergia || 'OTRA',
+      ubicacion: point.ubicacion || '',
+      metodoAccion: point.metodoAccion || '',
+      dispositivoBloqueo: point.dispositivoBloqueo || '',
+      validacion: point.validacion || ''
+    })));
+    setCatalogImages(machine.imagenes.length
+      ? machine.imagenes.map((image, index) => ({
+        url: image.url,
+        etiqueta: image.etiqueta || `Imagen ${index + 1}`,
+        orden: image.orden || index + 1
+      }))
+      : [{ url: '', etiqueta: 'Paso 5', orden: 1 }]);
+    setCatalogMessage(`Editando ${machine.nombre}`);
+    setMode('catalog');
+  }
+
   async function deleteMachine(machine) {
-    if (!window.confirm(`¿Eliminar la máquina ${machine.nombre}? Esta acción no se puede deshacer.`)) return;
+    if (!window.confirm(`¿Eliminar ${machine.nombre} y todo su historial LOTO? Esta acción no se puede deshacer.`)) return;
 
     try {
-      const res = await fetch(`${API_URL}/catalogo/maquinas/${machine.id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_URL}/catalogo/maquinas/${machine.id}`, {
+        method: 'DELETE',
+        headers: catalogHeaders()
+      });
       const data = await res.json();
 
       if (!res.ok) {
@@ -203,8 +302,35 @@ export default function App() {
         return;
       }
 
-      setMachinesMessage('Máquina eliminada');
+  setMachinesMessage(data.message);
       await loadMachines();
+    } catch (err) {
+      setMachinesMessage('No se pudo conectar con el backend');
+    }
+  }
+
+  async function unlockAdministration() {
+    if (!adminPassword) {
+      setMachinesMessage('Introduce la contraseña de administración');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/catalogo/acceso`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPassword })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMachinesMessage(data?.error || 'No se pudo autorizar el acceso');
+        return;
+      }
+
+      setAdminUnlocked(true);
+      setMachinesMessage('');
+      setMode('catalog');
     } catch (err) {
       setMachinesMessage('No se pudo conectar con el backend');
     }
@@ -286,6 +412,8 @@ export default function App() {
     })));
     setCheckinSteps(normalizeGenericSteps(savedEvent.pasosGenericos, 'CHECKIN'));
     setCheckoutSteps(normalizeGenericSteps(savedEvent.pasosGenericos, 'CHECKOUT').reverse());
+    setCheckoutServiceSteps(parseCheckoutSteps(savedEvent.checkoutPasos));
+    setBaseConditionConfirmed(Boolean(savedEvent.confirmacionBase));
   }
 
   async function resumeEvents() {
@@ -480,6 +608,47 @@ export default function App() {
     }
   }
 
+  async function completeCheckoutServiceStep(stepNumber) {
+    try {
+      const res = await fetch(`${API_URL}/eventos/${event.id}/checkout-step`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paso: stepNumber })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data?.error || 'No se pudo completar el paso de Check-out');
+        return;
+      }
+
+      setCheckoutServiceSteps(parseCheckoutSteps(data.checkoutPasos));
+      setError('');
+    } catch (err) {
+      setError('No se pudo guardar el paso de Check-out');
+    }
+  }
+
+  async function confirmBaseCondition() {
+    try {
+      const res = await fetch(`${API_URL}/eventos/${event.id}/confirmacion-base`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data?.error || 'No se pudo confirmar la condición base');
+        return;
+      }
+
+      setBaseConditionConfirmed(true);
+      setError('');
+    } catch (err) {
+      setError('No se pudo guardar la confirmación');
+    }
+  }
+
   async function closeEvent() {
     if (!event) return;
 
@@ -533,18 +702,38 @@ export default function App() {
             Check-out
           </button>
           <button
-            className={mode === 'catalog' ? 'mode-button active' : 'mode-button'}
-            onClick={() => { setMode('catalog'); setEvent(null); setError(''); }}
+            className={['admin', 'catalog', 'machines', 'active-events'].includes(mode) ? 'mode-button active' : 'mode-button'}
+            onClick={() => { setMode(adminUnlocked ? 'catalog' : 'admin'); setEvent(null); setError(''); setMachinesMessage(''); }}
           >
-            Registrar máquina
-          </button>
-          <button
-            className={mode === 'machines' ? 'mode-button active' : 'mode-button'}
-            onClick={() => { setMode('machines'); setEvent(null); setError(''); loadMachines(); }}
-          >
-            Ver máquinas
+            Administración
           </button>
         </div>
+
+        {mode === 'admin' && !adminUnlocked && (
+          <section className="admin-access">
+            <h2>Administración de máquinas</h2>
+            <label>
+              Contraseña
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+            </label>
+            <button type="button" className="primary" onClick={unlockAdministration}>Acceder</button>
+            {machinesMessage && <p className="error">{machinesMessage}</p>}
+          </section>
+        )}
+
+        {adminUnlocked && ['catalog', 'machines', 'active-events'].includes(mode) && (
+          <div className="admin-navigation">
+            <button type="button" className={mode === 'catalog' ? 'secondary active-admin' : 'secondary'} onClick={() => { setEditingMachineId(null); setCatalogMachine({ nombre: '', linea: '', qrCode: '' }); setCatalogPoints([{ identificador: '', nombre: '', tipoEnergia: 'OTRA', ubicacion: '', metodoAccion: '', dispositivoBloqueo: '', validacion: '' }]); setCatalogImages([{ url: '', etiqueta: 'Paso 5', orden: 1 }]); setCatalogMessage(''); setMode('catalog'); }}>Registrar máquina</button>
+            <button type="button" className={mode === 'machines' ? 'secondary active-admin' : 'secondary'} onClick={() => { setMode('machines'); loadMachines(); }}>Ver máquinas</button>
+            <button type="button" className={mode === 'active-events' ? 'secondary active-admin' : 'secondary'} onClick={() => { setMode('active-events'); loadActiveEvents(); }}>Eventos activos</button>
+            <button type="button" className="secondary" onClick={() => { setAdminUnlocked(false); setAdminPassword(''); setMode('admin'); setMachines([]); setSelectedMachine(null); setActiveMonitorEvents([]); }}>Salir</button>
+          </div>
+        )}
 
         {mode === 'machines' && (
           <section className="machine-management">
@@ -578,8 +767,10 @@ export default function App() {
                   <button type="button" className="danger" onClick={() => deleteMachine(selectedMachine)}>
                     Eliminar
                   </button>
+                  <button type="button" className="secondary" onClick={() => editMachine(selectedMachine)}>
+                    Editar
+                  </button>
                 </div>
-
                 <div className="lock-table" role="table" aria-label={`Bloqueos de ${selectedMachine.nombre}`}>
                   <div className="lock-table-header" role="row">
                     <span aria-hidden="true" />
@@ -619,8 +810,33 @@ export default function App() {
           </section>
         )}
 
+        {mode === 'active-events' && (
+          <section className="machine-management">
+            <div className="machine-management-heading">
+              <h2>Eventos LOTO activos</h2>
+              <button type="button" className="secondary" onClick={loadActiveEvents}>Actualizar</button>
+            </div>
+            {activeMonitorEvents.length > 0 && (
+              <div className="active-event-list">
+                {activeMonitorEvents.map((activeEvent) => (
+                  <article key={activeEvent.id} className="active-event-row">
+                    <div><span>Empleado</span><strong>{activeEvent.operador?.numeroEmpleado}</strong></div>
+                    <div><span>Máquina</span><strong>{activeEvent.maquina?.nombre}</strong><small>{activeEvent.maquina?.linea?.nombre || 'Sin línea'}</small></div>
+                    <div><span>Tiempo en LOTO</span><strong>{formatElapsed(activeEvent.horaInicio)}</strong></div>
+                  </article>
+                ))}
+              </div>
+            )}
+            {monitorMessage && <p className="status-message">{monitorMessage}</p>}
+          </section>
+        )}
+
         {mode === 'catalog' && (
           <section className="resume-section">
+            <div className="machine-management-heading">
+              <h2>{editingMachineId ? 'Editar máquina' : 'Registrar máquina'}</h2>
+              {editingMachineId && <button type="button" className="secondary" onClick={() => { setEditingMachineId(null); setCatalogMachine({ nombre: '', linea: '', qrCode: '' }); setCatalogPoints([{ identificador: '', nombre: '', tipoEnergia: 'OTRA', ubicacion: '', metodoAccion: '', dispositivoBloqueo: '', validacion: '' }]); setCatalogImages([{ url: '', etiqueta: 'Paso 5', orden: 1 }]); setCatalogMessage(''); }}>Nueva</button>}
+            </div>
             <label>
               Máquina
               <input value={catalogMachine.nombre} onChange={(e) => setCatalogMachine({ ...catalogMachine, nombre: e.target.value })} placeholder="Ej. Prensa 12" />
@@ -631,7 +847,7 @@ export default function App() {
             </label>
             <label>
               QR
-              <input value={catalogMachine.qrCode} onChange={(e) => setCatalogMachine({ ...catalogMachine, qrCode: e.target.value })} placeholder="Ej. A8-M01" />
+              <input value={catalogMachine.qrCode} onChange={(e) => setCatalogMachine({ ...catalogMachine, qrCode: e.target.value })} placeholder="Ej. A8-M01" readOnly={Boolean(editingMachineId)} />
             </label>
 
             <label>Puntos de bloqueo</label>
@@ -873,41 +1089,60 @@ export default function App() {
 
         {event && mode === 'checkout' && (
           <section className="checklist">
-            <h2>Checklist de desbloqueo</h2>
-
-            <div className="step-section-title">Paso 6: Bloquee las fuentes de energía</div>
-            <ul className="step-list">
-              {checkoutPoints.map((point, index) => (
-                <li key={`checkout-${point.puntoBloqueoId}`} className="point-row">
-                  <input
-                    type="checkbox"
-                    checked={point.completado}
-                    disabled={point.completado || (index > 0 && !checkoutPoints[index - 1].completado)}
-                    onChange={() => completeCheckoutPoint(point, index)}
-                  />
-                  <img className="energy-icon" src={energyImage(point.puntoBloqueo?.tipoEnergia)} alt="" />
-                  <span>{point.puntoBloqueo?.nombre} ({point.puntoBloqueo?.tipoEnergia || 'OTRA'})</span>
-                </li>
-              ))}
-            </ul>
+            <p className="checkout-heading">Regresar máquina o equipo a servicio / condiciones normales de operación</p>
+            <h2>Checklist de Check-out</h2>
 
             <ul className="step-list">
-              {checkoutSteps.map((step, index) => (
-                <li key={`checkout-step-${step.pasoGenericoId || index}`} className="step-row">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(step.completado)}
-                    disabled={step.completado || (index > 0 && !checkoutSteps[index - 1].completado)}
-                    onChange={() => completeCheckoutStep(step)}
-                  />
-                  <div className="step-text">
-                    <strong>{step.pasoGenerico?.titulo || `Paso ${index + 1}`}</strong>
-                    <p>{step.pasoGenerico?.descripcion}</p>
-                  </div>
-                </li>
-              ))}
+              {CHECKOUT_STEPS.map((description, index) => {
+                const stepNumber = index + 1;
+                const isLockoutRemoval = stepNumber === 6;
+                const previousComplete = stepNumber === 1 || checkoutServiceSteps.includes(stepNumber - 1);
+                const lockoutsComplete = checkoutPoints.every((point) => point.completado);
+
+                return (
+                  <li key={`checkout-service-${stepNumber}`} className="step-row checkout-step-row">
+                    <input
+                      type="checkbox"
+                      checked={checkoutServiceSteps.includes(stepNumber)}
+                      disabled={checkoutServiceSteps.includes(stepNumber) || !previousComplete || (isLockoutRemoval && !lockoutsComplete) || (stepNumber === 7 && !lockoutsComplete)}
+                      onChange={() => completeCheckoutServiceStep(stepNumber)}
+                    />
+                    <div className="step-text">
+                      <strong>Paso {stepNumber}</strong>
+                      <p>{description}</p>
+                      {isLockoutRemoval && (
+                        <div className="checkout-lockout-list">
+                          {checkoutPoints.map((point, pointIndex) => (
+                            <label key={`checkout-${point.puntoBloqueoId}`} className="checkout-lockout-row">
+                              <input
+                                type="checkbox"
+                                checked={point.completado}
+                                disabled={point.completado || !previousComplete || (pointIndex > 0 && !checkoutPoints[pointIndex - 1].completado)}
+                                onChange={() => completeCheckoutPoint(point, pointIndex)}
+                              />
+                              <img className="energy-icon" src={energyImage(point.puntoBloqueo?.tipoEnergia)} alt="" />
+                              <span>{point.puntoBloqueo?.nombre} ({point.puntoBloqueo?.tipoEnergia || 'OTRA'})</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
-            <button className="danger" disabled={!checkoutPoints.every((point) => point.completado) || !checkoutSteps.every((step) => step.completado)} onClick={closeEvent}>
+
+            <label className="base-condition-confirmation">
+              <input
+                type="checkbox"
+                checked={baseConditionConfirmed}
+                disabled={baseConditionConfirmed || !checkoutServiceSteps.includes(7)}
+                onChange={confirmBaseCondition}
+              />
+              <span>Al marcar esto estás de acuerdo que dejaste todo en condición base.</span>
+            </label>
+
+            <button className="danger" disabled={!checkoutPoints.every((point) => point.completado) || !checkoutServiceSteps.includes(7) || !baseConditionConfirmed} onClick={closeEvent}>
               Cerrar LOTO
             </button>
           </section>

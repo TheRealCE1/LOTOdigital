@@ -4,6 +4,7 @@ const path = require('node:path');
 const prisma = require('./lib/prisma');
 
 const app = express();
+const CATALOG_PASSWORD = 'smartfactory';
 
 app.use(cors());
 app.use(express.json());
@@ -54,6 +55,10 @@ function normalizeEmployeeNumber(value) {
   return String(value || '').trim();
 }
 
+function hasCatalogAccess(req) {
+  return String(req.get('x-admin-password') || '') === CATALOG_PASSWORD;
+}
+
 async function ensureGenericSteps(eventoId) {
   const [pasos, existentes] = await Promise.all([
     prisma.pasoGenerico.findMany({ select: { id: true } }),
@@ -86,7 +91,19 @@ app.get('/api/lineas', async (req, res) => {
   res.json(lineas);
 });
 
+app.post('/api/catalogo/acceso', (req, res) => {
+  if (String(req.body?.password || '') !== CATALOG_PASSWORD) {
+    return res.status(403).json({ error: 'Contraseña de administración incorrecta' });
+  }
+
+  return res.json({ message: 'Acceso autorizado' });
+});
+
 app.get('/api/catalogo/maquinas', async (req, res) => {
+  if (!hasCatalogAccess(req)) {
+    return res.status(403).json({ error: 'Acceso de administración requerido' });
+  }
+
   const maquinas = await prisma.maquina.findMany({
     include: {
       linea: true,
@@ -107,11 +124,15 @@ app.delete('/api/catalogo/maquinas/:id', async (req, res) => {
     return res.status(400).json({ error: 'Identificador de máquina no válido' });
   }
 
+  if (!hasCatalogAccess(req)) {
+    return res.status(403).json({ error: 'Acceso de administración requerido' });
+  }
+
   const maquina = await prisma.maquina.findUnique({
     where: { id: maquinaId },
     include: {
       bloqueoActivo: true,
-      eventos: { select: { id: true }, take: 1 }
+      eventos: { select: { id: true } }
     }
   });
 
@@ -119,24 +140,29 @@ app.delete('/api/catalogo/maquinas/:id', async (req, res) => {
     return res.status(404).json({ error: 'Máquina no encontrada' });
   }
 
-  if (maquina.bloqueoActivo) {
-    return res.status(409).json({ error: 'No se puede eliminar una máquina con un LOTO abierto' });
-  }
-
-  if (maquina.eventos.length > 0) {
-    return res.status(409).json({ error: 'No se puede eliminar una máquina con historial LOTO; el historial debe conservarse' });
-  }
-
   await prisma.$transaction(async (tx) => {
+    const eventoIds = maquina.eventos.map((evento) => evento.id);
+
+    if (eventoIds.length) {
+      await tx.eventoPunto.deleteMany({ where: { eventoId: { in: eventoIds } } });
+      await tx.eventoPasoGenerico.deleteMany({ where: { eventoId: { in: eventoIds } } });
+      await tx.bloqueoMaquina.deleteMany({ where: { eventoId: { in: eventoIds } } });
+      await tx.eventoLOTO.deleteMany({ where: { id: { in: eventoIds } } });
+    }
+
     await tx.imagenMaquina.deleteMany({ where: { maquinaId } });
     await tx.puntoBloqueo.deleteMany({ where: { maquinaId } });
     await tx.maquina.delete({ where: { id: maquinaId } });
   });
 
-  return res.json({ message: 'Máquina eliminada' });
+  return res.json({ message: 'Máquina e historial LOTO eliminados' });
 });
 
 app.post('/api/catalogo/maquinas', async (req, res) => {
+  if (!hasCatalogAccess(req)) {
+    return res.status(403).json({ error: 'Acceso de administración requerido' });
+  }
+
   const { nombre, linea, qrCode, puntos = [], imagenes = [] } = req.body;
 
   if (!nombre || !linea || !qrCode) {
@@ -259,10 +285,14 @@ app.get('/api/maquinas/:qrCode', async (req, res) => {
 });
 
 app.get('/api/eventos/activos', async (req, res) => {
+  if (!hasCatalogAccess(req)) {
+    return res.status(403).json({ error: 'Acceso de administración requerido' });
+  }
+
   const eventos = await prisma.eventoLOTO.findMany({
     where: { estado: 'ABIERTO' },
     include: {
-      maquina: true,
+      maquina: { include: { linea: true } },
       operador: true,
       puntos: true
     },
@@ -630,6 +660,68 @@ app.post('/api/eventos/:id/checkpoint', async (req, res) => {
   return res.json({ message: 'Paso actualizado', paso: eventoPaso });
 });
 
+app.post('/api/eventos/:id/checkout-step', async (req, res) => {
+  const paso = Number(req.body?.paso);
+
+  if (!Number.isInteger(paso) || paso < 1 || paso > 7) {
+    return res.status(400).json({ error: 'Paso de Check-out no válido' });
+  }
+
+  const evento = await prisma.eventoLOTO.findUnique({
+    where: { id: Number(req.params.id) },
+    include: {
+      maquina: { include: { puntos: { orderBy: { orden: 'asc' } } } },
+      puntos: true
+    }
+  });
+
+  if (!evento || evento.estado === 'CERRADO') {
+    return res.status(409).json({ error: 'El evento no está disponible para Check-out' });
+  }
+
+  const completados = JSON.parse(evento.checkoutPasos || '[]');
+  const anterior = paso - 1;
+  const bloqueosRetirados = evento.maquina.puntos.every((punto) =>
+    evento.puntos.some((item) => item.puntoBloqueoId === punto.id && item.tipo === 'CHECKOUT' && item.completado)
+  );
+
+  if ((paso === 6 || paso === 7) && !bloqueosRetirados) {
+    return res.status(409).json({ error: 'Debes retirar todos los bloqueos antes de continuar' });
+  }
+
+  if (paso > 1 && !completados.includes(anterior)) {
+    return res.status(409).json({ error: 'Debes completar primero el paso anterior de Check-out' });
+  }
+
+  const nuevosCompletados = [...new Set([...completados, paso])].sort((a, b) => a - b);
+  const actualizado = await prisma.eventoLOTO.update({
+    where: { id: evento.id },
+    data: { checkoutPasos: JSON.stringify(nuevosCompletados) }
+  });
+
+  return res.json({ message: 'Paso de Check-out actualizado', checkoutPasos: actualizado.checkoutPasos });
+});
+
+app.post('/api/eventos/:id/confirmacion-base', async (req, res) => {
+  const evento = await prisma.eventoLOTO.findUnique({ where: { id: Number(req.params.id) } });
+
+  if (!evento || evento.estado === 'CERRADO') {
+    return res.status(409).json({ error: 'El evento no está disponible para confirmación' });
+  }
+
+  const completados = JSON.parse(evento.checkoutPasos || '[]');
+  if (completados.length !== 7) {
+    return res.status(409).json({ error: 'Completa todos los pasos de Check-out antes de confirmar la condición base' });
+  }
+
+  await prisma.eventoLOTO.update({
+    where: { id: evento.id },
+    data: { confirmacionBase: true }
+  });
+
+  return res.json({ message: 'Condición base confirmada' });
+});
+
 app.post('/api/eventos/:id/checkout', async (req, res) => {
   const evento = await prisma.eventoLOTO.findUnique({
     where: { id: Number(req.params.id) },
@@ -675,12 +767,9 @@ app.post('/api/eventos/:id/checkout', async (req, res) => {
     return res.status(409).json({ error: 'No puedes cerrar el evento con el checklist de bloqueo incompleto' });
   }
 
-  const pasosCheckout = [...evento.pasosGenericos]
-    .filter((item) => item.tipo === 'CHECKOUT')
-    .sort((a, b) => b.pasoGenerico.orden - a.pasoGenerico.orden);
-
   const puntosInversos = [...evento.maquina.puntos].reverse();
-  const checkoutCompleto = pasosCheckout.every((item) => item.completado) &&
+  const pasosCheckout = JSON.parse(evento.checkoutPasos || '[]');
+  const checkoutCompleto = pasosCheckout.length === 7 && evento.confirmacionBase &&
     puntosInversos.every((punto) =>
       evento.puntos.some(
         (eventoPunto) => eventoPunto.puntoBloqueoId === punto.id &&
@@ -691,7 +780,7 @@ app.post('/api/eventos/:id/checkout', async (req, res) => {
 
   if (!checkoutCompleto) {
     return res.status(409).json({
-      error: 'Confirma físicamente todos los puntos de desbloqueo en orden inverso'
+      error: 'Completa el checklist de regreso a servicio, retira los bloqueos y confirma la condición base'
     });
   }
 

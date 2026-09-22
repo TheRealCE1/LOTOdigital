@@ -83,6 +83,8 @@ model EventoLOTO {
   bloqueoActivo       BloqueoMaquina?
   integracionEnviada  Boolean              @default(false)
   integracionError    String?
+  checkoutPasos       String               @default("[]")
+  confirmacionBase    Boolean              @default(false)
 }
 
 model BloqueoMaquina {
