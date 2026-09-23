@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('node:path');
+const { randomUUID } = require('node:crypto');
 const prisma = require('./lib/prisma');
 
 const app = express();
@@ -63,6 +64,17 @@ async function sendClosedEvent(evento, puntos) {
 
 function normalizeEmployeeNumber(value) {
   return String(value || '').trim();
+}
+
+function generateMachineQr(linea) {
+  const lineaCode = String(linea || 'LOTO')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 12) || 'LOTO';
+
+  return `LOTO-${lineaCode}-${randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
 function hasCatalogAccess(req) {
@@ -184,10 +196,11 @@ app.post('/api/catalogo/maquinas', async (req, res) => {
   }
 
   const { nombre, linea, qrCode, puntos = [], imagenes = [] } = req.body;
+  const codigoQr = String(qrCode || '').trim() || generateMachineQr(linea);
 
-  if (!nombre || !linea || !qrCode) {
+  if (!nombre || !linea) {
     return res.status(400).json({
-      error: 'nombre, linea y qrCode son obligatorios'
+      error: 'nombre y linea son obligatorios'
     });
   }
 
@@ -219,11 +232,11 @@ app.post('/api/catalogo/maquinas', async (req, res) => {
       });
 
       const maquinaRegistro = await tx.maquina.upsert({
-        where: { qrCode: String(qrCode).trim() },
+        where: { qrCode: codigoQr },
         update: { nombre: String(nombre).trim(), lineaId: lineaRegistro.id },
         create: {
           nombre: String(nombre).trim(),
-          qrCode: String(qrCode).trim(),
+          qrCode: codigoQr,
           lineaId: lineaRegistro.id
         }
       });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
+import QRCode from 'qrcode';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -51,6 +52,7 @@ export default function App() {
   }]);
   const [catalogImages, setCatalogImages] = useState([{ url: '', etiqueta: '', ubicacionReferencia: '', orden: 1 }]);
   const [catalogMessage, setCatalogMessage] = useState('');
+  const [generatedQr, setGeneratedQr] = useState(null);
   const [editingMachineId, setEditingMachineId] = useState(null);
   const [machines, setMachines] = useState([]);
   const [selectedMachine, setSelectedMachine] = useState(null);
@@ -240,8 +242,8 @@ export default function App() {
   }, [mode]);
 
   async function registerMachine() {
-    if (!catalogMachine.nombre.trim() || !catalogMachine.linea.trim() || !catalogMachine.qrCode.trim()) {
-      setCatalogMessage('Captura máquina, línea y QR');
+    if (!catalogMachine.nombre.trim() || !catalogMachine.linea.trim()) {
+      setCatalogMessage('Captura máquina y línea');
       return;
     }
 
@@ -270,7 +272,19 @@ export default function App() {
 
       setQrCode(data.maquina.qrCode);
       setResolvedMachine(data.maquina);
-      setCatalogMessage(editingMachineId ? 'Máquina actualizada' : 'Máquina registrada y lista para Check-in');
+      setCatalogMachine((current) => ({ ...current, qrCode: data.maquina.qrCode }));
+      if (editingMachineId) {
+        setCatalogMessage('Máquina actualizada');
+        return;
+      }
+
+      const imageUrl = await QRCode.toDataURL(data.maquina.qrCode, {
+        width: 360,
+        margin: 2,
+        color: { dark: '#0f172a', light: '#ffffff' }
+      });
+      setGeneratedQr({ value: data.maquina.qrCode, imageUrl, nombre: data.maquina.nombre });
+      setCatalogMessage('Máquina registrada. Descarga o imprime el QR para identificarla.');
     } catch (err) {
       setCatalogMessage('No se pudo conectar con el backend');
     }
@@ -854,7 +868,7 @@ export default function App() {
 
         {adminUnlocked && ['catalog', 'machines', 'active-events', 'history'].includes(mode) && (
           <div className="admin-navigation">
-            <button type="button" className={mode === 'catalog' ? 'secondary active-admin' : 'secondary'} onClick={() => { setEditingMachineId(null); setCatalogMachine({ nombre: '', linea: '', qrCode: '' }); setCatalogPoints([{ identificador: '', nombre: '', tipoEnergia: 'OTRA', ubicacion: '', metodoAccion: '', dispositivoBloqueo: '', validacion: '' }]); setCatalogImages([{ url: '', etiqueta: '', ubicacionReferencia: '', orden: 1 }]); setCatalogMessage(''); setMode('catalog'); }}>Registrar máquina</button>
+            <button type="button" className={mode === 'catalog' ? 'secondary active-admin' : 'secondary'} onClick={() => { setEditingMachineId(null); setCatalogMachine({ nombre: '', linea: '', qrCode: '' }); setCatalogPoints([{ identificador: '', nombre: '', tipoEnergia: 'OTRA', ubicacion: '', metodoAccion: '', dispositivoBloqueo: '', validacion: '' }]); setCatalogImages([{ url: '', etiqueta: '', ubicacionReferencia: '', orden: 1 }]); setGeneratedQr(null); setCatalogMessage(''); setMode('catalog'); }}>Registrar máquina</button>
             <button type="button" className={mode === 'machines' ? 'secondary active-admin' : 'secondary'} onClick={() => { setMode('machines'); loadMachines(); }}>Ver máquinas</button>
             <button type="button" className={mode === 'active-events' ? 'secondary active-admin' : 'secondary'} onClick={() => { setMode('active-events'); loadActiveEvents(); }}>Eventos activos</button>
             <button type="button" className={mode === 'history' ? 'secondary active-admin' : 'secondary'} onClick={() => { setMode('history'); loadEventHistory(); }}>Historial</button>
@@ -986,7 +1000,7 @@ export default function App() {
           <section className="resume-section">
             <div className="machine-management-heading">
               <h2>{editingMachineId ? 'Editar máquina' : 'Registrar máquina'}</h2>
-              {editingMachineId && <button type="button" className="secondary" onClick={() => { setEditingMachineId(null); setCatalogMachine({ nombre: '', linea: '', qrCode: '' }); setCatalogPoints([{ identificador: '', nombre: '', tipoEnergia: 'OTRA', ubicacion: '', metodoAccion: '', dispositivoBloqueo: '', validacion: '' }]); setCatalogImages([{ url: '', etiqueta: '', ubicacionReferencia: '', orden: 1 }]); setCatalogMessage(''); }}>Nueva</button>}
+              {editingMachineId && <button type="button" className="secondary" onClick={() => { setEditingMachineId(null); setCatalogMachine({ nombre: '', linea: '', qrCode: '' }); setCatalogPoints([{ identificador: '', nombre: '', tipoEnergia: 'OTRA', ubicacion: '', metodoAccion: '', dispositivoBloqueo: '', validacion: '' }]); setCatalogImages([{ url: '', etiqueta: '', ubicacionReferencia: '', orden: 1 }]); setGeneratedQr(null); setCatalogMessage(''); }}>Nueva</button>}
             </div>
             <label>
               Máquina
@@ -998,7 +1012,7 @@ export default function App() {
             </label>
             <label>
               QR
-              <input value={catalogMachine.qrCode} onChange={(e) => setCatalogMachine({ ...catalogMachine, qrCode: e.target.value })} placeholder="Ej. A8-M01" readOnly={Boolean(editingMachineId)} />
+              <input value={catalogMachine.qrCode} onChange={(e) => setCatalogMachine({ ...catalogMachine, qrCode: e.target.value })} placeholder={editingMachineId ? '' : 'Se generará automáticamente'} readOnly={Boolean(editingMachineId)} />
             </label>
 
             <label>Puntos de bloqueo</label>
@@ -1149,6 +1163,16 @@ export default function App() {
 
             <button className="secondary" onClick={registerMachine}>Registrar máquina</button>
             {catalogMessage && <p className="status-message">{catalogMessage}</p>}
+            {generatedQr && (
+              <section className="generated-qr">
+                <img src={generatedQr.imageUrl} alt={`QR de ${generatedQr.nombre}`} />
+                <div>
+                  <strong>{generatedQr.nombre}</strong>
+                  <span>{generatedQr.value}</span>
+                  <a className="primary qr-download" href={generatedQr.imageUrl} download={`QR-${generatedQr.value}.png`}>Descargar QR</a>
+                </div>
+              </section>
+            )}
           </section>
         )}
 
