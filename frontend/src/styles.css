@@ -3,19 +3,19 @@
   line-height: 1.5;
   font-weight: 400;
   color: var(--txt1);
-  background: #070f23;
-  --txt1: rgba(255, 255, 255, .92);
-  --txt2: rgba(255, 255, 255, .58);
-  --txt3: rgba(255, 255, 255, .34);
-  --ink: rgba(255, 255, 255, .92);
-  --muted: rgba(255, 255, 255, .54);
-  --blue: #60a5fa;
-  --blue-deep: #93c5fd;
-  --surface: rgba(9, 24, 50, .86);
-  --surface-solid: rgba(255, 255, 255, .10);
-  --line: rgba(191, 219, 254, .16);
-  --shadow-light: rgba(96, 165, 250, .08);
-  --shadow-dark: rgba(0, 0, 0, .32);
+  background: #ffffff;
+  --txt1: #172033;
+  --txt2: #5f6b7a;
+  --txt3: #7d8794;
+  --ink: #172033;
+  --muted: #667085;
+  --blue: #2563eb;
+  --blue-deep: #1d4ed8;
+  --surface: #ffffff;
+  --surface-solid: #f4f7fb;
+  --line: #dbe4f0;
+  --shadow-light: rgba(37, 99, 235, .08);
+  --shadow-dark: rgba(31, 41, 55, .12);
 }
 
 * {
@@ -32,10 +32,10 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(ellipse at 75% 5%, rgba(30, 90, 220, .28) 0%, transparent 52%),
-    radial-gradient(ellipse at 15% 95%, rgba(15, 55, 180, .22) 0%, transparent 48%),
-    radial-gradient(ellipse at 50% 50%, rgba(10, 30, 90, .35) 0%, transparent 70%),
-    linear-gradient(168deg, #04091a 0%, #070f23 30%, #0b162e 60%, #0e1c38 100%);
+    radial-gradient(ellipse at 75% 5%, rgba(37, 99, 235, .08) 0%, transparent 52%),
+    radial-gradient(ellipse at 15% 95%, rgba(59, 130, 246, .06) 0%, transparent 48%),
+    radial-gradient(ellipse at 50% 50%, rgba(96, 165, 250, .05) 0%, transparent 70%),
+    #ffffff;
   background-attachment: fixed;
 }
 
@@ -97,7 +97,7 @@ h1 {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 10px;
-  box-shadow: 0 14px 42px var(--shadow-dark), inset 0 1px 0 rgba(255, 255, 255, .06);
+  box-shadow: 0 14px 42px var(--shadow-dark), 0 1px 0 rgba(255, 255, 255, .9) inset;
   -webkit-backdrop-filter: blur(22px);
   backdrop-filter: blur(22px);
   padding: 20px;
@@ -111,10 +111,10 @@ h1 {
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   padding: 4px;
-  background: rgba(255, 255, 255, .045);
-  border: 1px solid rgba(255, 255, 255, .07);
+  background: #f6f8fc;
+  border: 1px solid #e1e7f0;
   border-radius: 8px;
-  box-shadow: inset 3px 3px 8px rgba(0, 0, 0, .22), inset -3px -3px 8px rgba(255, 255, 255, .04);
+  box-shadow: inset 2px 2px 5px rgba(31, 41, 55, .06), inset -2px -2px 5px rgba(255, 255, 255, .9);
 }
 
 .mode-button {
@@ -124,9 +124,9 @@ h1 {
 }
 
 .mode-button.active {
-  background: rgba(96, 165, 250, .20);
-  color: white;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .24), inset 0 1px 0 rgba(255, 255, 255, .08);
+  background: rgba(37, 99, 235, .10);
+  color: #172033;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, .12), inset 0 1px 0 rgba(255, 255, 255, .9);
 }
 
 label {
@@ -138,17 +138,17 @@ label {
 
 input {
   min-height: 44px;
-  border: 1px solid rgba(255, 255, 255, .12);
+  border: 1px solid #cfd8e6;
   border-radius: 6px;
   padding: 12px 14px;
   color: var(--ink);
-  background: rgba(255, 255, 255, .07);
-  box-shadow: inset 4px 4px 9px rgba(0, 0, 0, .16), inset -4px -4px 9px rgba(255, 255, 255, .025);
+  background: #f8fafc;
+  box-shadow: inset 2px 2px 5px rgba(31, 41, 55, .06), inset -2px -2px 5px rgba(255, 255, 255, .9);
 }
 
 input:focus {
   border-color: var(--blue);
-  outline: 2px solid rgba(96, 165, 250, .28);
+  outline: 2px solid rgba(37, 99, 235, .18);
   outline-offset: 2px;
 }
 
@@ -165,7 +165,7 @@ button {
 
 button:active:not(:disabled) {
   transform: translateY(1px);
-  box-shadow: inset 3px 3px 7px rgba(83, 106, 153, 0.28), inset -3px -3px 7px rgba(255, 255, 255, 0.36);
+  box-shadow: inset 3px 3px 7px rgba(83, 106, 153, .12), inset -3px -3px 7px rgba(255, 255, 255, .9);
 }
 
 button:disabled {
@@ -175,14 +175,14 @@ button:disabled {
 
 .primary {
   background: #2563eb;
-  color: white;
-  box-shadow: 0 8px 18px rgba(37, 99, 235, .24);
+  color: #172033;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, .18);
 }
 
 .secondary {
   background: var(--surface-solid);
   color: var(--txt1);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, .18), inset 0 1px 0 rgba(255, 255, 255, .07);
+  box-shadow: 0 8px 20px rgba(31, 41, 55, .08), inset 0 1px 0 rgba(255, 255, 255, .9);
 }
 
 .primary:hover:not(:disabled),
@@ -195,7 +195,7 @@ button:disabled {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.62);
   border-radius: 10px;
-  background: #111827;
+  background: #f3f6fa;
 }
 
 .qr-reader video {
@@ -206,16 +206,16 @@ button:disabled {
 .danger {
   background: #f4dfe3;
   color: #a2253a;
-  box-shadow: 5px 5px 10px rgba(155, 101, 112, 0.2), -5px -5px 10px rgba(255, 255, 255, 0.7);
+  box-shadow: 5px 5px 10px rgba(155, 101, 112, .10), -5px -5px 10px rgba(255, 255, 255, .9);
 }
 
 .machine-box {
-  background: rgba(255, 255, 255, .06);
-  border: 1px solid rgba(255, 255, 255, .08);
+  background: #f7f9fc;
+  border: 1px solid #e0e7f0;
   border-radius: 8px;
   padding: 12px 14px;
   color: var(--txt2);
-  box-shadow: inset 3px 3px 8px rgba(0, 0, 0, .14), inset -3px -3px 8px rgba(255, 255, 255, .025);
+  box-shadow: inset 2px 2px 5px rgba(31, 41, 55, .05), inset -2px -2px 5px rgba(255, 255, 255, .9);
 }
 
 .machine-box p {
@@ -249,18 +249,18 @@ button:disabled {
 }
 
 select {
-  border: 1px solid rgba(255, 255, 255, .12);
+  border: 1px solid #cfd8e6;
   border-radius: 6px;
   padding: 12px 14px;
   color: var(--txt1);
-  background: rgba(255, 255, 255, .07);
+  background: #f8fafc;
   font: inherit;
   min-height: 44px;
 }
 
 select option {
-  background: #0b162e;
-  color: white;
+  background: #ffffff;
+  color: #172033;
 }
 
 .catalog-menu {
@@ -303,8 +303,8 @@ select option {
   padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 12px;
-  background: rgba(225, 234, 247, 0.54);
-  box-shadow: 4px 4px 9px rgba(108, 132, 172, 0.16), -4px -4px 9px rgba(255, 255, 255, 0.62);
+  background: #f4f7fb;
+  box-shadow: 4px 4px 9px rgba(108, 132, 172, .10), -4px -4px 9px rgba(255, 255, 255, .9);
 }
 
 .checklist ul {
@@ -366,7 +366,7 @@ select option {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, .025);
+  background: #fbfcfe;
 }
 
 .step-row > input[type="checkbox"],
@@ -389,7 +389,7 @@ select option {
 
 .checkout-step-row {
   padding: 12px;
-  background: rgba(255, 255, 255, .045);
+  background: #f6f8fc;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
@@ -414,9 +414,9 @@ select option {
   gap: 14px;
   padding: 18px;
   margin: 18px 0;
-  border: 2px solid rgba(96, 165, 250, .55);
+  border: 2px solid rgba(37, 99, 235, .38);
   border-radius: 8px;
-  background: rgba(96, 165, 250, .12);
+  background: rgba(37, 99, 235, .07);
   color: var(--txt1);
   font-size: 1rem;
 }
@@ -437,15 +437,15 @@ select option {
 }
 
 .checkout-pending {
-  color: #fde68a;
-  background: rgba(202, 138, 4, .13);
-  border: 1px solid rgba(253, 230, 138, .24);
+  color: #9a6700;
+  background: #fff8db;
+  border: 1px solid #f0d36b;
 }
 
 .checkout-ready {
-  color: #bbf7d0;
-  background: rgba(22, 163, 74, .14);
-  border: 1px solid rgba(187, 247, 208, .26);
+  color: #166534;
+  background: #ecfdf3;
+  border: 1px solid #a7e3bf;
 }
 
 .step-text {
@@ -465,7 +465,7 @@ select option {
 }
 
 .step-warning {
-  color: #f5c542;
+  color: #a16207;
   font-size: 0.85rem;
 }
 
@@ -484,7 +484,7 @@ select option {
   flex-direction: column;
   justify-content: center;
   padding: 6px;
-  background: rgba(255, 255, 255, .035);
+  background: #f8fafc;
   border: 1px solid var(--line);
   border-radius: 6px;
 }
@@ -495,7 +495,7 @@ select option {
   max-height: 260px;
   object-fit: contain;
   border-radius: 6px;
-  background: rgba(0, 0, 0, .18);
+  background: #eef2f7;
 }
 
 .step-images figcaption {
@@ -523,9 +523,9 @@ select option {
   align-items: center;
   gap: 18px;
   padding: 16px;
-  border: 1px solid rgba(96, 165, 250, .42);
+  border: 1px solid rgba(37, 99, 235, .30);
   border-radius: 8px;
-  background: rgba(96, 165, 250, .10);
+  background: rgba(37, 99, 235, .07);
 }
 
 .generated-qr img {
@@ -581,7 +581,7 @@ select option {
 }
 
 .active-admin {
-  outline: 1px solid rgba(147, 197, 253, .7);
+  outline: 1px solid rgba(37, 99, 235, .45);
   color: var(--blue-deep);
 }
 
@@ -626,7 +626,7 @@ select option {
   padding: 10px 12px;
   text-align: left;
   border: 1px solid transparent;
-  background: rgba(255, 255, 255, .045);
+  background: #f6f8fc;
   color: var(--txt1);
 }
 
@@ -636,8 +636,8 @@ select option {
 }
 
 .machine-list-item.active {
-  background: rgba(96, 165, 250, .18);
-  border: 1px solid rgba(147, 197, 253, .46);
+  background: rgba(37, 99, 235, .09);
+  border: 1px solid rgba(37, 99, 235, .32);
 }
 
 .machine-detail {
@@ -660,7 +660,7 @@ select option {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   padding: 12px;
-  background: rgba(255, 255, 255, .05);
+  background: #f7f9fc;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
@@ -711,7 +711,7 @@ select option {
 }
 
 .lock-table-header {
-  background: rgba(96, 165, 250, .14);
+  background: rgba(37, 99, 235, .08);
   color: var(--blue-deep);
   font-size: .78rem;
   font-weight: 700;
