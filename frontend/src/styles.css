@@ -32,9 +32,8 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(ellipse at 75% 5%, rgba(37, 99, 235, .08) 0%, transparent 52%),
-    radial-gradient(ellipse at 15% 95%, rgba(59, 130, 246, .06) 0%, transparent 48%),
-    radial-gradient(ellipse at 50% 50%, rgba(96, 165, 250, .05) 0%, transparent 70%),
+    radial-gradient(ellipse at 75% 5%, rgba(37, 99, 235, .055) 0%, transparent 48%),
+    radial-gradient(ellipse at 15% 95%, rgba(59, 130, 246, .035) 0%, transparent 44%),
     #ffffff;
   background-attachment: fixed;
 }
@@ -95,9 +94,9 @@ h1 {
 
 .card {
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  box-shadow: 0 14px 42px var(--shadow-dark), 0 1px 0 rgba(255, 255, 255, .9) inset;
+  border: 1px solid #e3eaf4;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(31, 41, 55, .07), 0 2px 6px rgba(31, 41, 55, .035), inset 0 1px 0 rgba(255, 255, 255, .95);
   -webkit-backdrop-filter: blur(22px);
   backdrop-filter: blur(22px);
   padding: 20px;
@@ -111,7 +110,7 @@ h1 {
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   padding: 4px;
-  background: #f6f8fc;
+  background: #f8fafc;
   border: 1px solid #e1e7f0;
   border-radius: 8px;
   box-shadow: inset 2px 2px 5px rgba(31, 41, 55, .06), inset -2px -2px 5px rgba(255, 255, 255, .9);
@@ -126,7 +125,7 @@ h1 {
 .mode-button.active {
   background: rgba(37, 99, 235, .10);
   color: #172033;
-  box-shadow: 0 6px 16px rgba(37, 99, 235, .12), inset 0 1px 0 rgba(255, 255, 255, .9);
+  box-shadow: 0 5px 14px rgba(37, 99, 235, .10), inset 0 1px 0 rgba(255, 255, 255, .95);
 }
 
 label {
@@ -138,23 +137,23 @@ label {
 
 input {
   min-height: 44px;
-  border: 1px solid #cfd8e6;
-  border-radius: 6px;
+  border: 1px solid #d5deea;
+  border-radius: 8px;
   padding: 12px 14px;
   color: var(--ink);
-  background: #f8fafc;
+  background: #ffffff;
   box-shadow: inset 2px 2px 5px rgba(31, 41, 55, .06), inset -2px -2px 5px rgba(255, 255, 255, .9);
 }
 
 input:focus {
   border-color: var(--blue);
-  outline: 2px solid rgba(37, 99, 235, .18);
+  outline: 3px solid rgba(37, 99, 235, .12);
   outline-offset: 2px;
 }
 
 button {
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 12px 14px;
   font-weight: 700;
   cursor: pointer;
@@ -176,13 +175,13 @@ button:disabled {
 .primary {
   background: #2563eb;
   color: #172033;
-  box-shadow: 0 8px 18px rgba(37, 99, 235, .18);
+  box-shadow: 0 7px 16px rgba(37, 99, 235, .16), 0 1px 2px rgba(37, 99, 235, .10);
 }
 
 .secondary {
   background: var(--surface-solid);
   color: var(--txt1);
-  box-shadow: 0 8px 20px rgba(31, 41, 55, .08), inset 0 1px 0 rgba(255, 255, 255, .9);
+  box-shadow: 0 6px 14px rgba(31, 41, 55, .06), inset 0 1px 0 rgba(255, 255, 255, .95);
 }
 
 .primary:hover:not(:disabled),
@@ -210,7 +209,7 @@ button:disabled {
 }
 
 .machine-box {
-  background: #f7f9fc;
+  background: #f8fafc;
   border: 1px solid #e0e7f0;
   border-radius: 8px;
   padding: 12px 14px;
@@ -249,8 +248,8 @@ button:disabled {
 }
 
 select {
-  border: 1px solid #cfd8e6;
-  border-radius: 6px;
+  border: 1px solid #d5deea;
+  border-radius: 8px;
   padding: 12px 14px;
   color: var(--txt1);
   background: #f8fafc;
@@ -303,7 +302,7 @@ select option {
   padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 12px;
-  background: #f4f7fb;
+  background: #f8fafc;
   box-shadow: 4px 4px 9px rgba(108, 132, 172, .10), -4px -4px 9px rgba(255, 255, 255, .9);
 }
 
@@ -365,8 +364,8 @@ select option {
 .step-row {
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fbfcfe;
+  border-radius: 10px;
+  background: #ffffff;
 }
 
 .step-row > input[type="checkbox"],
@@ -389,7 +388,7 @@ select option {
 
 .checkout-step-row {
   padding: 12px;
-  background: #f6f8fc;
+  background: #f8fafc;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
@@ -626,7 +625,7 @@ select option {
   padding: 10px 12px;
   text-align: left;
   border: 1px solid transparent;
-  background: #f6f8fc;
+  background: #f8fafc;
   color: var(--txt1);
 }
 
@@ -660,7 +659,7 @@ select option {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   padding: 12px;
-  background: #f7f9fc;
+  background: #f8fafc;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
@@ -819,4 +818,60 @@ select option {
 .catalog-lock-table .secondary {
   grid-column: 1 / -1;
   justify-self: start;
+}
+
+
+/* Light-theme polish: same blue palette, cleaner surfaces and interaction states. */
+.card,
+.catalog-menu,
+.session-list li,
+.step-row,
+.checkout-step-row,
+.active-event-row,
+.machine-box,
+.generated-qr,
+.lock-table {
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+input:hover,
+select:hover {
+  border-color: #b9c7da;
+}
+
+button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.primary:hover:not(:disabled) {
+  filter: brightness(1.04);
+  box-shadow: 0 9px 20px rgba(37, 99, 235, .18);
+}
+
+.secondary:hover:not(:disabled) {
+  background: #f1f5fa;
+  filter: none;
+}
+
+.mode-button:not(.active):hover {
+  background: rgba(37, 99, 235, .055);
+  color: #1d4ed8;
+}
+
+.step-row:hover,
+.active-event-row:hover,
+.session-list li:hover,
+.machine-list-item:hover {
+  border-color: #cbd7e6;
+}
+
+h1,
+h2,
+h3 {
+  color: #172033;
+}
+
+::selection {
+  background: rgba(37, 99, 235, .16);
+  color: #172033;
 }
